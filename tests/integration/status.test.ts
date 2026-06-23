@@ -30,6 +30,11 @@ describe("status", () => {
       expect(stale.status).toBe("Stale");
       expect(stale.reliability).toBe("Low");
       expect(stale.changedFiles).toBeGreaterThan(0);
+
+      await indexContextGraph(project.root);
+      const freshAgain = await getContextStatus(project.root);
+      expect(freshAgain.status).toBe("Fresh");
+      expect(freshAgain.changedFiles).toBe(0);
     } finally {
       await project.cleanup();
     }
