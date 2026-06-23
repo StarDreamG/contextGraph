@@ -2,6 +2,7 @@
 import { Command } from "commander";
 import { registerIndexCommand } from "../commands/indexCommand.js";
 import { registerInitCommand } from "../commands/initCommand.js";
+import { registerQueryCommand } from "../commands/queryCommand.js";
 import { registerStatusCommand } from "../commands/statusCommand.js";
 
 export function buildProgram(): Command {
@@ -10,6 +11,7 @@ export function buildProgram(): Command {
   registerInitCommand(program);
   registerIndexCommand(program);
   registerStatusCommand(program);
+  registerQueryCommand(program);
   return program;
 }
 
