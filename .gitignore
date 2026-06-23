@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.contextgraph/
+.codegraph/
+*.log
+
