@@ -1,12 +1,11 @@
 #!/usr/bin/env node
 import { Command } from "commander";
+import { registerInitCommand } from "../commands/initCommand.js";
 
 export function buildProgram(): Command {
   const program = new Command();
   program.name("contextgraph").description("Local-first context graph for coding agents.");
-  program.command("init").description("Initialize ContextGraph").action(() => {
-    console.log("init is not implemented yet");
-  });
+  registerInitCommand(program);
   return program;
 }
 
