@@ -19,6 +19,10 @@ describe("query", () => {
       expect(result.status.status).toBe("Fresh");
       expect(result.results.length).toBeGreaterThan(0);
       expect(result.results[0]?.sourcePath).toBe("AGENTS.md");
+
+      const multiTerm = await queryContext(project.root, "导出 测试");
+      expect(multiTerm.results.length).toBeGreaterThan(0);
+      expect(multiTerm.results.some((item) => item.content.includes("导出"))).toBe(true);
     } finally {
       await project.cleanup();
     }

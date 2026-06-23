@@ -83,7 +83,7 @@ function toFtsQuery(query: string): string {
     .split(/\s+/)
     .filter(Boolean)
     .map(toFtsTerm)
-    .join(" ");
+    .join(" OR ");
 }
 
 function toFtsTerm(term: string): string {
