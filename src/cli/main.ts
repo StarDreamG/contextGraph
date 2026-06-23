@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 import { Command } from "commander";
+import { registerIndexCommand } from "../commands/indexCommand.js";
 import { registerInitCommand } from "../commands/initCommand.js";
 
 export function buildProgram(): Command {
   const program = new Command();
   program.name("contextgraph").description("Local-first context graph for coding agents.");
   registerInitCommand(program);
+  registerIndexCommand(program);
   return program;
 }
 

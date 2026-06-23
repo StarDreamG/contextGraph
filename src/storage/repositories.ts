@@ -62,6 +62,23 @@ export class GraphRepository {
     }
   }
 
+  deleteSourcesExcept(sourceIds: string[]): void {
+    if (sourceIds.length === 0) {
+      this.db.prepare("DELETE FROM nodes_fts").run();
+      this.db.prepare("DELETE FROM sources").run();
+      return;
+    }
+
+    const placeholders = sourceIds.map(() => "?").join(", ");
+    this.db
+      .prepare(
+        `DELETE FROM nodes_fts
+         WHERE node_id IN (SELECT id FROM nodes WHERE source_id NOT IN (${placeholders}))`
+      )
+      .run(...sourceIds);
+    this.db.prepare(`DELETE FROM sources WHERE id NOT IN (${placeholders})`).run(...sourceIds);
+  }
+
   setStatus(snapshot: StatusSnapshot): void {
     const stmt = this.db.prepare(
       `INSERT INTO status (key, value) VALUES (?, ?)

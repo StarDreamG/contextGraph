@@ -1,0 +1,185 @@
+import { readFileSync } from "node:fs";
+import { writeFile } from "node:fs/promises";
+import path from "node:path";
+import { loadConfig } from "../config/loadConfig.js";
+import { currentGitHead } from "../git/gitState.js";
+import { classifyBlock } from "../indexing/classifier.js";
+import { sha256, stableId } from "../indexing/hash.js";
+import { scanSources } from "../indexing/scanner.js";
+import { parseJsonBlocks } from "../parsing/json.js";
+import { parseMarkdownBlocks } from "../parsing/markdown.js";
+import { parseTextBlocks } from "../parsing/text.js";
+import type { ParsedBlock } from "../parsing/types.js";
+import { redactSecrets } from "../security/redaction.js";
+import { openDatabase } from "../storage/database.js";
+import { GraphRepository } from "../storage/repositories.js";
+import { migrate } from "../storage/schema.js";
+import type { BlockRecord, NodeRecord, SourceRecord, StatusSnapshot } from "../types/domain.js";
+
+export interface IndexResult {
+  sourcesScanned: number;
+  sourcesChanged: number;
+  blocksIndexed: number;
+  nodesCreated: number;
+  nodesUpdated: number;
+  edgesCreated: number;
+  currentHead: string | null;
+  indexedHead: string | null;
+  lastIndexedAt: string;
+  status: "Fresh" | "Stale";
+}
+
+interface ExistingSource {
+  id: string;
+  path: string;
+  hash: string;
+}
+
+export async function indexContextGraph(projectRoot: string): Promise<IndexResult> {
+  const config = await loadConfig(projectRoot);
+  const sourcePaths = await scanSources(projectRoot, config);
+  const currentHead = await currentGitHead(projectRoot);
+  const lastIndexedAt = new Date().toISOString();
+  const db = openDatabase(path.join(projectRoot, ".contextgraph", "graph.db"));
+  migrate(db);
+  const repository = new GraphRepository(db);
+  const existingSources = readExistingSources(db);
+  const seenSourceIds = new Set<string>();
+  let sourcesChanged = 0;
+  let blocksIndexed = 0;
+  let nodesCreated = 0;
+
+  repository.transaction(() => {
+    for (const relativePath of sourcePaths) {
+      const absolutePath = path.join(projectRoot, relativePath);
+      const raw = readFileSync(absolutePath, "utf8");
+      const redacted = redactSecrets(raw);
+      const sourceHash = sha256(redacted);
+      const sourceId = stableId("source", relativePath);
+      seenSourceIds.add(sourceId);
+
+      if (existingSources.get(sourceId)?.hash === sourceHash) {
+        continue;
+      }
+
+      sourcesChanged += 1;
+      const parsedBlocks = parseSource(relativePath, redacted);
+      const source: SourceRecord = {
+        id: sourceId,
+        path: relativePath,
+        type: sourceType(relativePath),
+        hash: sourceHash,
+        gitHead: currentHead,
+        lastIndexedAt,
+        metadata: {}
+      };
+      const blocks = toBlockRecords(source, parsedBlocks, lastIndexedAt);
+      const nodes = blocks.flatMap((block) => toNodeRecords(block, classifyBlock({
+        title: block.title,
+        content: block.content,
+        sourceId: block.sourceId,
+        blockId: block.id
+      }), lastIndexedAt));
+
+      repository.upsertSource(source);
+      repository.replaceBlocksAndNodes(source.id, blocks, nodes);
+      blocksIndexed += blocks.length;
+      nodesCreated += nodes.length;
+    }
+
+    repository.deleteSourcesExcept([...seenSourceIds]);
+  });
+
+  const counts = repository.counts();
+  const snapshot: StatusSnapshot = {
+    status: "Fresh",
+    reliability: "High",
+    lastIndexedAt,
+    currentGitHead: currentHead,
+    indexedGitHead: currentHead,
+    sourceCount: counts.sources,
+    blockCount: counts.blocks,
+    nodeCount: counts.nodes,
+    edgeCount: counts.edges,
+    changedFiles: 0,
+    pendingBlocks: 0,
+    failedBlocks: 0,
+    conflicts: 0,
+    warnings: []
+  };
+  repository.setStatus(snapshot);
+  db.close();
+  await writeFile(path.join(projectRoot, ".contextgraph", "status.json"), `${JSON.stringify(snapshot, null, 2)}\n`);
+
+  return {
+    sourcesScanned: sourcePaths.length,
+    sourcesChanged,
+    blocksIndexed,
+    nodesCreated,
+    nodesUpdated: 0,
+    edgesCreated: 0,
+    currentHead,
+    indexedHead: currentHead,
+    lastIndexedAt,
+    status: "Fresh"
+  };
+}
+
+function readExistingSources(db: ReturnType<typeof openDatabase>): Map<string, ExistingSource> {
+  const rows = db.prepare("SELECT id, path, hash FROM sources").all() as ExistingSource[];
+  return new Map(rows.map((row) => [row.id, row]));
+}
+
+function parseSource(relativePath: string, content: string): ParsedBlock[] {
+  const ext = path.extname(relativePath).toLowerCase();
+  if (ext === ".md" || ext === ".mdc") {
+    return parseMarkdownBlocks(relativePath, content);
+  }
+  if (ext === ".json") {
+    return parseJsonBlocks(relativePath, content);
+  }
+  return parseTextBlocks(relativePath, content);
+}
+
+function sourceType(relativePath: string): string {
+  const ext = path.extname(relativePath).toLowerCase();
+  if (ext === ".md" || ext === ".mdc") return "markdown";
+  if (ext === ".json") return "json";
+  return "text";
+}
+
+function toBlockRecords(source: SourceRecord, blocks: ParsedBlock[], timestamp: string): BlockRecord[] {
+  return blocks.map((block, index) => ({
+    id: stableId("block", source.id, String(index), block.title ?? ""),
+    sourceId: source.id,
+    path: source.path,
+    blockType: block.blockType,
+    title: block.title,
+    content: block.content,
+    hash: sha256(block.content),
+    startLine: block.startLine,
+    endLine: block.endLine,
+    createdAt: timestamp,
+    updatedAt: timestamp
+  }));
+}
+
+function toNodeRecords(
+  block: BlockRecord,
+  drafts: ReturnType<typeof classifyBlock>,
+  timestamp: string
+): NodeRecord[] {
+  return drafts.map((draft) => ({
+    id: stableId("node", block.id, draft.type, sha256(draft.content)),
+    type: draft.type,
+    title: draft.title,
+    content: draft.content,
+    sourceId: block.sourceId,
+    blockId: block.id,
+    confidence: draft.confidence,
+    status: draft.status,
+    metadata: draft.metadata,
+    createdAt: timestamp,
+    updatedAt: timestamp
+  }));
+}
