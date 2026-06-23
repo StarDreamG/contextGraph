@@ -32,6 +32,8 @@ Idea → Product context → Issue → Implementation → PR → Review → Done
 ## Phase 2 Required Scope
 - 必须支持导入本机已有 Agent session，尤其是 Codex 历史 session。这是工具开箱即用的关键能力。
 - 导入必须按项目归属过滤，只导入与当前项目路径、Git remote、文件路径或明确任务上下文相关的 session。
+- 必须从历史 session 和本地项目上下文中抽取“项目工具环境画像”，包括该项目曾经加载或依赖过的 MCP server、skills、插件/连接器、浏览器自动化能力、测试工具和文档/表格/PDF 等工作能力。
+- 项目工具环境画像必须能回答：这个项目中，新 Agent 开始工作前通常应该启用哪些 MCP server、优先使用哪些 skills、哪些工具只在特定任务中使用，以及哪些工具曾经失败或不适用。
 - 导入前必须做敏感内容脱敏，并保留来源、时间、项目归属和置信度。
 - 默认导入摘要化后的经验节点，而不是把原始长对话全文直接塞进图谱。
 - 必须支持增量导入、导入状态、失败重试和可审计日志。
@@ -46,3 +48,4 @@ Idea → Product context → Issue → Implementation → PR → Review → Done
 - Phase 2 首批支持哪些 session 来源：Codex 原始 session、Codex rollout summary、Claude/Cursor 历史，还是先只做 Codex。
 - 历史 session 项目归属的置信度阈值如何定义。
 - 是否需要在导入前提供 dry-run 报告和逐项确认。
+- 工具环境画像的数据模型如何拆分：`McpServer`、`Skill`、`Plugin`、`ToolCapability` 是否作为独立节点类型，还是先统一为 `ToolCapability`。

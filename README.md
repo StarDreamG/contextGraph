@@ -81,3 +81,5 @@ MCP 使用 stdio。日志和诊断信息写入 stderr，stdout 保留给 MCP 协
 第一版不包含 watch 模式、历史 session 导入、embedding、向量数据库、远程 LLM 抽取、规则冲突检测、UI、VS Code 扩展、Codex 侧边栏、云同步或团队权限。
 
 历史 session 导入是必做的 Phase 2。它应该通过显式、脱敏、可审计、摘要优先的流程导入现有项目相关 Codex sessions，让已有项目初始化后立刻有可查询的历史经验。
+
+Phase 2 还必须建立项目工具环境画像。它要从历史 sessions 和本地配置中抽取这个项目常用或曾经失败的 MCP servers、skills、插件/连接器、浏览器/Playwright 自动化、文档/PDF/表格工具和测试工具，让新 Agent 能知道开工前该加载哪些能力。

@@ -23,6 +23,7 @@ ContextGraph 需要为编程 Agent 提供本地、可查询、可信的新鲜上
 - 远程 LLM、云同步、向量数据库、UI、编辑器扩展。
 - 全局 npm 安装、`npm link`、Docker 运行。
 - 存量历史 session 导入不在 MVP 内实现，但 Phase 2 必须实现，不能从路线中移除。
+- 项目工具环境画像不在 MVP 内实现，但 Phase 2 必须从历史 session 中抽取该项目常用 MCP server、skills、插件/连接器和自动化工具。
 
 ## Acceptance criteria
 
@@ -51,3 +52,4 @@ ContextGraph 需要为编程 Agent 提供本地、可查询、可信的新鲜上
 - MCP stdout 被日志污染会破坏协议。
 - FTS 查询语法需要清洗。
 - 如果没有 Phase 2 的存量 session 导入，已有项目只能从新 handoff 开始积累，上手价值会不足。
+- 如果没有项目工具环境画像，新 Agent 仍不知道该项目应优先加载哪些 MCP server、skills 和自动化工具。
