@@ -17,6 +17,21 @@
 - 依赖只写入本仓库 `package.json` 和 lockfile，通过 `npm install` 安装到本仓库 `node_modules`。
 - 当前实现不使用 Docker。若测试需要隔离项目，使用 Node 临时目录和临时 Git 仓库。
 - 写实现代码前执行 `superpowers:test-driven-development`；遇到失败或异常时执行 `superpowers:systematic-debugging`；声明完成前执行 `superpowers:verification-before-completion`。
+- MVP 不实现存量历史 session 导入，但文档和本地 Issue 必须明确：Phase 2 必须实现 `import-sessions`，这是已有项目开箱即用的关键能力。
+
+## Phase 2 必做约束
+
+MVP 结束后的下一阶段必须实现存量 Agent session 导入，优先支持本机 Codex 历史 session。该能力不是可选增强项，而是 ContextGraph 在多项目、多 Agent 环境中开箱即用的核心条件。
+
+Phase 2 设计必须满足：
+
+- 显式命令入口，例如 `contextgraph import-sessions`。
+- 支持 dry-run，导入前展示候选 session 数量、时间范围、估算体积、匹配项目原因和隐私风险。
+- 默认只导入与当前项目相关的 session，匹配依据包括工作目录、文件路径、Git remote、项目名和任务上下文。
+- 导入前先脱敏，导入时默认保存摘要节点和来源指针，不默认把原始长对话全文写入图谱。
+- 支持时间范围和增量导入，例如最近 7 天、30 天或指定日期之后。
+- 记录导入状态、失败项、跳过项和可审计日志。
+- 跨项目或全量私有历史导入必须由用户显式授权。
 
 ## 文件结构与职责
 
@@ -88,6 +103,7 @@ ContextGraph 需要为编程 Agent 提供本地、可查询、可信的新鲜上
 - Watch 模式。
 - 远程 LLM、云同步、向量数据库、UI、编辑器扩展。
 - 全局 npm 安装、`npm link`、Docker 运行。
+- 存量历史 session 导入不在 MVP 内实现，但 Phase 2 必须实现，不能从路线中移除。
 
 ## Acceptance criteria
 
@@ -115,6 +131,7 @@ ContextGraph 需要为编程 Agent 提供本地、可查询、可信的新鲜上
 - status 若只比较 Git HEAD 会漏掉未提交文件变化。
 - MCP stdout 被日志污染会破坏协议。
 - FTS 查询语法需要清洗。
+- 如果没有 Phase 2 的存量 session 导入，已有项目只能从新 handoff 开始积累，上手价值会不足。
 ```
 
 - [ ] **Step 2: 创建 package.json**
@@ -1700,7 +1717,9 @@ The server uses stdio. Logs and diagnostics are written to stderr so stdout rema
 
 ## MVP Limits
 
-The first version does not include watch mode, embeddings, vector databases, remote LLM extraction, rule conflict detection, UI, VS Code extension, Codex sidebar, cloud sync, or team permissions.
+The first version does not include watch mode, historical session import, embeddings, vector databases, remote LLM extraction, rule conflict detection, UI, VS Code extension, Codex sidebar, cloud sync, or team permissions.
+
+Historical session import is the required Phase 2. It should import existing project-related Codex sessions through an explicit, redacted, auditable, summary-first workflow so existing projects become useful immediately after initialization.
 ```
 
 - [ ] **Step 3: Run full verification**
@@ -1727,6 +1746,7 @@ git commit -m "docs: add README and end-to-end workflow test"
 - Inspect `README.md`
 - Inspect `docs/process/local-issues/0001-contextgraph-mvp.md`
 - Inspect `docs/superpowers/specs/2026-06-15-contextgraph-mvp-design.md`
+- Inspect `docs/product/01-prd.md`
 
 - [ ] **Step 1: Verify Git identity and remote safety**
 
@@ -1787,7 +1807,17 @@ printf '## 测试\n必须运行 npm test\n' > "$tmpdir/AGENTS.md"
 
 Expected: init, index, status, query, and handoff all succeed. Remove the temp directory after verification.
 
-- [ ] **Step 5: Commit any audit fixes**
+- [ ] **Step 5: Verify Phase 2 requirement remains documented**
+
+Run:
+
+```bash
+rg -n "Phase 2|import-sessions|存量|历史 session" README.md docs/process/local-issues/0001-contextgraph-mvp.md docs/product/01-prd.md docs/superpowers/specs/2026-06-15-contextgraph-mvp-design.md
+```
+
+Expected: README, local issue, PRD, and design spec all state that historical session import is not MVP scope but is required Phase 2 work.
+
+- [ ] **Step 6: Commit any audit fixes**
 
 If verification requires code or documentation changes:
 
@@ -1800,7 +1830,7 @@ If no changes are required, do not create an empty commit.
 
 ## Plan Self-Review
 
-- Spec coverage: tasks cover project setup, local task source, default config, secret handling, SQLite schema, init, parsing, classification, indexing, status, query, handoff, MCP, README, and verification.
+- Spec coverage: tasks cover project setup, local task source, default config, secret handling, SQLite schema, init, parsing, classification, indexing, status, query, handoff, MCP, README, verification, and the documented Phase 2 requirement for historical session import.
 - Placeholder scan: plan contains no unresolved placeholder markers or deferred implementation slots.
 - Type consistency: shared domain types use `GraphStatus`, `Reliability`, `ContextGraphConfig`, `SourceRecord`, `BlockRecord`, `NodeRecord`, `QueryResult`, and `StatusSnapshot`; later tasks refer to those names consistently.
-- Scope check: watch mode, remote LLM, embeddings, UI, global npm usage, Docker, and GitLab remote usage remain outside the MVP.
+- Scope check: watch mode, historical session import implementation, remote LLM, embeddings, UI, global npm usage, Docker, and GitLab remote usage remain outside the MVP; historical session import remains mandatory Phase 2 work.
