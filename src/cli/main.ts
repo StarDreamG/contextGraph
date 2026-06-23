@@ -3,6 +3,7 @@ import { Command } from "commander";
 import { registerHandoffCommand } from "../commands/handoffCommand.js";
 import { registerIndexCommand } from "../commands/indexCommand.js";
 import { registerInitCommand } from "../commands/initCommand.js";
+import { registerMcpCommand } from "../commands/mcpCommand.js";
 import { registerQueryCommand } from "../commands/queryCommand.js";
 import { registerStatusCommand } from "../commands/statusCommand.js";
 
@@ -14,6 +15,7 @@ export function buildProgram(): Command {
   registerStatusCommand(program);
   registerQueryCommand(program);
   registerHandoffCommand(program);
+  registerMcpCommand(program);
   return program;
 }
 
