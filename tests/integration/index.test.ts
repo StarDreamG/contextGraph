@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { initContextGraph } from "../../src/core/initService.js";
@@ -25,6 +25,30 @@ describe("index", () => {
         true
       );
       expect(fts.length).toBe(nodes.length);
+      db.close();
+    } finally {
+      await project.cleanup();
+    }
+  });
+
+  it("indexes context sources in nested project directories by default", async () => {
+    const project = await createTempProject();
+    try {
+      await mkdir(path.join(project.root, "service-a"), { recursive: true });
+      await mkdir(path.join(project.root, "service-a", "logs"), { recursive: true });
+      await writeFile(path.join(project.root, "README.md"), "# Root project\n");
+      await writeFile(path.join(project.root, "service-a", "pom.xml"), "<project><name>service-a</name></project>\n");
+      await writeFile(path.join(project.root, "service-a", "logs", "api-access.log"), "noise\n");
+      await initContextGraph(project.root);
+
+      const result = await indexContextGraph(project.root);
+
+      expect(result.sourcesScanned).toBeGreaterThanOrEqual(2);
+
+      const db = new Database(path.join(project.root, ".contextgraph", "graph.db"));
+      const sources = db.prepare("SELECT path FROM sources ORDER BY path").all() as Array<{ path: string }>;
+      expect(sources.map((source) => source.path)).toContain("service-a/pom.xml");
+      expect(sources.map((source) => source.path)).not.toContain("service-a/logs/api-access.log");
       db.close();
     } finally {
       await project.cleanup();
