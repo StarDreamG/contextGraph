@@ -1,0 +1,42 @@
+{
+  "name": "@stardreamg/contextgraph",
+  "version": "0.1.0",
+  "description": "Local-first context graph for coding agents.",
+  "type": "module",
+  "engines": {
+    "node": ">=22 <25"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "bin": {
+    "contextgraph": "./bin/contextgraph"
+  },
+  "scripts": {
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "contextgraph": "node dist/cli/main.js",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.13.0",
+    "better-sqlite3": "^11.10.0",
+    "commander": "^12.1.0",
+    "fast-glob": "^3.3.3",
+    "gray-matter": "^4.0.3",
+    "zod": "^3.25.67"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.15.34",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}

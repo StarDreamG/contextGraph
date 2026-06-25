@@ -53,12 +53,18 @@ MVP 只记录从 `contextgraph handoff` 开始的新会话摘要，因此它能�
 
 该能力的产品目标是：用户在一个已有项目中初始化 ContextGraph 后，可以把过去已经发生过的调试、修复、测试、部署和决策经验转化为可查询图谱，而不是从零积累 handoff。
 
+第二阶段还必须建立“项目工具环境画像”。新 Agent 不只需要知道项目规约和历史修复，也需要知道这个项目过去依赖哪些 MCP server、skills、插件/连接器和自动化工具。否则它仍要重新试探工具环境，开箱即用价值会打折。
+
 第二阶段边界：
 
 - 提供显式命令，例如 `contextgraph import-sessions`。
 - 默认只导入与当前项目有关的 session，项目归属依据包括工作目录、文件路径、Git remote、项目名和任务上下文。
 - 导入前提供 dry-run 统计，展示候选 session 数量、时间范围、估算体积、匹配原因和风险提示。
 - 导入内容先脱敏，再摘要化为 `AgentSession`、`Failure`、`Fix`、`Decision`、`Test`、`Command`、`Environment` 或 `Note` 节点。
+- 从历史 session 和本地配置中抽取工具能力节点，至少覆盖 MCP server、skills、插件/连接器、浏览器/Playwright 自动化、文档/PDF/表格处理能力和测试工具。
+- 工具能力节点要记录工具名称、类型、适用任务、项目关联证据、最近使用时间、成功/失败记录、置信度和来源 session。
+- `contextgraph query` 和 MCP 查询必须能回答“这个项目开始工作前应该加载哪些工具/skills/MCP server”。
+- `contextgraph status` 或后续专门命令要能显示工具环境画像是否存在、是否来自过期 session、是否缺少关键工具线索。
 - 原始长对话不得默认全文写入图谱；如需保存原文引用，必须保存来源指针和摘要，并明确标记隐私风险。
 - 支持按时间范围增量导入，例如最近 7 天、30 天或指定日期之后。
 - 每次导入要记录状态、失败项、跳过项和可审计日志。

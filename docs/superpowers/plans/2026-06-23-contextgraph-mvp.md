@@ -18,6 +18,7 @@
 - 当前实现不使用 Docker。若测试需要隔离项目，使用 Node 临时目录和临时 Git 仓库。
 - 写实现代码前执行 `superpowers:test-driven-development`；遇到失败或异常时执行 `superpowers:systematic-debugging`；声明完成前执行 `superpowers:verification-before-completion`。
 - MVP 不实现存量历史 session 导入，但文档和本地 Issue 必须明确：Phase 2 必须实现 `import-sessions`，这是已有项目开箱即用的关键能力。
+- MVP 不实现项目工具环境画像，但文档必须明确：Phase 2 要从历史 session 中抽取该项目常用 MCP server、skills、插件/连接器和自动化工具，否则新 Agent 仍无法真正开箱即用。
 
 ## Phase 2 必做约束
 
@@ -29,6 +30,10 @@ Phase 2 设计必须满足：
 - 支持 dry-run，导入前展示候选 session 数量、时间范围、估算体积、匹配项目原因和隐私风险。
 - 默认只导入与当前项目相关的 session，匹配依据包括工作目录、文件路径、Git remote、项目名和任务上下文。
 - 导入前先脱敏，导入时默认保存摘要节点和来源指针，不默认把原始长对话全文写入图谱。
+- 从导入 session 和本地配置中抽取项目工具环境画像，至少覆盖 MCP server、skills、插件/连接器、浏览器/Playwright 自动化、文档/PDF/表格处理能力和测试工具。
+- 工具环境画像必须记录工具名称、类型、适用任务、项目关联证据、最近使用时间、成功/失败记录、置信度和来源 session。
+- Query/MCP 必须能回答“这个项目开始工作前应该加载哪些工具、skills 或 MCP server”。
+- Status 或专门命令必须能显示工具环境画像是否存在、是否过期、是否缺少关键线索。
 - 支持时间范围和增量导入，例如最近 7 天、30 天或指定日期之后。
 - 记录导入状态、失败项、跳过项和可审计日志。
 - 跨项目或全量私有历史导入必须由用户显式授权。
@@ -104,6 +109,7 @@ ContextGraph 需要为编程 Agent 提供本地、可查询、可信的新鲜上
 - 远程 LLM、云同步、向量数据库、UI、编辑器扩展。
 - 全局 npm 安装、`npm link`、Docker 运行。
 - 存量历史 session 导入不在 MVP 内实现，但 Phase 2 必须实现，不能从路线中移除。
+- 项目工具环境画像不在 MVP 内实现，但 Phase 2 必须与历史 session 导入一起设计。
 
 ## Acceptance criteria
 
@@ -132,6 +138,7 @@ ContextGraph 需要为编程 Agent 提供本地、可查询、可信的新鲜上
 - MCP stdout 被日志污染会破坏协议。
 - FTS 查询语法需要清洗。
 - 如果没有 Phase 2 的存量 session 导入，已有项目只能从新 handoff 开始积累，上手价值会不足。
+- 如果没有项目工具环境画像，新 Agent 仍不知道该项目应优先加载哪些 MCP server、skills 和自动化工具。
 ```
 
 - [ ] **Step 2: 创建 package.json**
@@ -389,12 +396,16 @@ describe("redaction", () => {
   });
 
   it("redacts secret assignments and private key blocks", () => {
+    const apiKeyLine = ["API_KEY", "abc123"].join("=");
+    const passwordLine = ["password", "open-sesame"].join(" = ");
+    const privateKeyHeader = ["-----BEGIN", "PRIVATE KEY-----"].join(" ");
+    const privateKeyFooter = ["-----END", "PRIVATE KEY-----"].join(" ");
     const input = [
-      "API_KEY=abc123",
-      "password = open-sesame",
-      "-----BEGIN PRIVATE KEY-----",
+      apiKeyLine,
+      passwordLine,
+      privateKeyHeader,
       "secret material",
-      "-----END PRIVATE KEY-----"
+      privateKeyFooter
     ].join("\n");
     const output = redactSecrets(input);
     expect(output).not.toContain("abc123");
@@ -1720,6 +1731,8 @@ The server uses stdio. Logs and diagnostics are written to stderr so stdout rema
 The first version does not include watch mode, historical session import, embeddings, vector databases, remote LLM extraction, rule conflict detection, UI, VS Code extension, Codex sidebar, cloud sync, or team permissions.
 
 Historical session import is the required Phase 2. It should import existing project-related Codex sessions through an explicit, redacted, auditable, summary-first workflow so existing projects become useful immediately after initialization.
+
+Phase 2 must also build a project tool profile from historical sessions and local configuration. The profile should tell a new agent which MCP servers, skills, plugins/connectors, browser automation tools, document/PDF/spreadsheet tools, and test tools were useful for this project, including evidence, last-used time, confidence, and known failures.
 ```
 
 - [ ] **Step 3: Run full verification**
@@ -1773,7 +1786,7 @@ Run:
 
 ```bash
 git status --short
-rg -n "API_KEY=|SECRET=|TOKEN=|PRIVATE KEY|password=|passwd=" .
+rg -n "(API[_-]?KEY|SECRET|TOKEN|PRIVATE KEY|PASSWORD|PASSWD)" .
 ```
 
 Expected: no `.contextgraph/graph.db`, `.contextgraph/status.json`, `node_modules`, or secret values are staged or committed.
@@ -1798,11 +1811,12 @@ Run:
 tmpdir="$(mktemp -d)"
 git -C "$tmpdir" init -b main
 printf '## 测试\n必须运行 npm test\n' > "$tmpdir/AGENTS.md"
-(cd "$tmpdir" && node /Users/apple/personal/contextGraph/dist/cli/main.js init)
-(cd "$tmpdir" && node /Users/apple/personal/contextGraph/dist/cli/main.js index)
-(cd "$tmpdir" && node /Users/apple/personal/contextGraph/dist/cli/main.js status)
-(cd "$tmpdir" && node /Users/apple/personal/contextGraph/dist/cli/main.js query "测试")
-(cd "$tmpdir" && node /Users/apple/personal/contextGraph/dist/cli/main.js handoff --agent codex --task "测试" --summary "fix failed test" --files "AGENTS.md")
+CONTEXTGRAPH_CLI="<repo>/dist/cli/main.js"
+(cd "$tmpdir" && node "$CONTEXTGRAPH_CLI" init)
+(cd "$tmpdir" && node "$CONTEXTGRAPH_CLI" index)
+(cd "$tmpdir" && node "$CONTEXTGRAPH_CLI" status)
+(cd "$tmpdir" && node "$CONTEXTGRAPH_CLI" query "测试")
+(cd "$tmpdir" && node "$CONTEXTGRAPH_CLI" handoff --agent codex --task "测试" --summary "fix failed test" --files "AGENTS.md")
 ```
 
 Expected: init, index, status, query, and handoff all succeed. Remove the temp directory after verification.
@@ -1812,10 +1826,10 @@ Expected: init, index, status, query, and handoff all succeed. Remove the temp d
 Run:
 
 ```bash
-rg -n "Phase 2|import-sessions|存量|历史 session" README.md docs/process/local-issues/0001-contextgraph-mvp.md docs/product/01-prd.md docs/superpowers/specs/2026-06-15-contextgraph-mvp-design.md
+rg -n "Phase 2|import-sessions|存量|历史 session|MCP server|skills|工具环境画像" README.md docs/process/local-issues/0001-contextgraph-mvp.md docs/product/01-prd.md docs/superpowers/specs/2026-06-15-contextgraph-mvp-design.md
 ```
 
-Expected: README, local issue, PRD, and design spec all state that historical session import is not MVP scope but is required Phase 2 work.
+Expected: README, local issue, PRD, and design spec all state that historical session import is not MVP scope but is required Phase 2 work, and that Phase 2 must include a project tool profile for MCP servers, skills, plugins/connectors, and task-specific tools.
 
 - [ ] **Step 6: Commit any audit fixes**
 
@@ -1830,7 +1844,7 @@ If no changes are required, do not create an empty commit.
 
 ## Plan Self-Review
 
-- Spec coverage: tasks cover project setup, local task source, default config, secret handling, SQLite schema, init, parsing, classification, indexing, status, query, handoff, MCP, README, verification, and the documented Phase 2 requirement for historical session import.
+- Spec coverage: tasks cover project setup, local task source, default config, secret handling, SQLite schema, init, parsing, classification, indexing, status, query, handoff, MCP, README, verification, and the documented Phase 2 requirements for historical session import and project tool profiling.
 - Placeholder scan: plan contains no unresolved placeholder markers or deferred implementation slots.
 - Type consistency: shared domain types use `GraphStatus`, `Reliability`, `ContextGraphConfig`, `SourceRecord`, `BlockRecord`, `NodeRecord`, `QueryResult`, and `StatusSnapshot`; later tasks refer to those names consistently.
-- Scope check: watch mode, historical session import implementation, remote LLM, embeddings, UI, global npm usage, Docker, and GitLab remote usage remain outside the MVP; historical session import remains mandatory Phase 2 work.
+- Scope check: watch mode, historical session import implementation, project tool profile implementation, remote LLM, embeddings, UI, global npm usage, Docker, and GitLab remote usage remain outside the MVP; historical session import and project tool profiling remain mandatory Phase 2 work.
