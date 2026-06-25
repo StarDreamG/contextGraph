@@ -8,15 +8,27 @@ import { createTempProject } from "../helpers/project.js";
 const execFileAsync = promisify(execFile);
 
 describe("CLI e2e", () => {
-  it("exposes a stable development wrapper as the package binary", async () => {
+  it("exposes publishable package metadata and a portable binary wrapper", async () => {
     const packageJson = JSON.parse(await readFile(path.resolve("package.json"), "utf8")) as {
+      name?: string;
+      private?: boolean;
       bin?: Record<string, string>;
+      files?: string[];
+      scripts?: Record<string, string>;
+      publishConfig?: Record<string, string>;
     };
     const wrapper = await readFile(path.resolve("bin/contextgraph"), "utf8");
 
+    expect(packageJson.name).toBe("@stardreamg/contextgraph");
+    expect(packageJson.private).not.toBe(true);
     expect(packageJson.bin?.contextgraph).toBe("./bin/contextgraph");
-    expect(wrapper).toContain("/Users/apple/.nvm/versions/node/v24.14.1/bin/node");
+    expect(wrapper).toContain("#!/usr/bin/env bash");
+    expect(wrapper).not.toContain("/Users/apple/.nvm/versions/node/v24.14.1/bin/node");
     expect(wrapper).toContain("dist/cli/main.js");
+    expect(wrapper).toContain('NODE_BIN="$INVOKED_DIR/node"');
+    expect(packageJson.files).toEqual(expect.arrayContaining(["bin", "dist", "README.md"]));
+    expect(packageJson.scripts?.prepack).toBe("npm run build");
+    expect(packageJson.publishConfig?.access).toBe("public");
   });
 
   it("runs init, index, status, query, and handoff from the built CLI", async () => {
@@ -42,6 +54,11 @@ describe("CLI e2e", () => {
 
       const query = await execFileAsync("node", [cli, "query", "测试"], { cwd: project.root });
       expect(query.stdout).toContain("Relevant Context:");
+
+      const brief = await execFileAsync("node", [cli, "brief"], { cwd: project.root });
+      expect(brief.stdout).toContain("ContextGraph Brief");
+      expect(brief.stdout).toContain("P1 Required Workflow");
+      expect(brief.stdout).toContain("Tool Profile");
 
       const handoff = await execFileAsync(
         "node",

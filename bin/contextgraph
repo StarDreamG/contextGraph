@@ -1,19 +1,27 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-NODE_BIN="/Users/apple/.nvm/versions/node/v24.14.1/bin/node"
-SOURCE_PATH="${BASH_SOURCE[0]}"
+INVOKED_PATH="${BASH_SOURCE[0]}"
+INVOKED_DIR="$(cd "$(dirname "$INVOKED_PATH")" && pwd)"
+SOURCE_PATH="$INVOKED_PATH"
+
 while [[ -L "$SOURCE_PATH" ]]; do
   SOURCE_DIR="$(cd "$(dirname "$SOURCE_PATH")" && pwd)"
   SOURCE_PATH="$(readlink "$SOURCE_PATH")"
   [[ "$SOURCE_PATH" != /* ]] && SOURCE_PATH="$SOURCE_DIR/$SOURCE_PATH"
 done
+
 SCRIPT_DIR="$(cd "$(dirname "$SOURCE_PATH")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CLI_MAIN="$PROJECT_ROOT/dist/cli/main.js"
+NODE_BIN="$INVOKED_DIR/node"
 
 if [[ ! -x "$NODE_BIN" ]]; then
-  echo "ContextGraph requires Node v24.14.1 at $NODE_BIN" >&2
+  NODE_BIN="$(command -v node || true)"
+fi
+
+if [[ -z "$NODE_BIN" ]]; then
+  echo "ContextGraph requires Node.js >=22 <25, but node was not found." >&2
   exit 1
 fi
 

@@ -1,11 +1,18 @@
 {
-  "name": "contextgraph",
+  "name": "@stardreamg/contextgraph",
   "version": "0.1.0",
   "description": "Local-first context graph for coding agents.",
   "type": "module",
-  "private": true,
   "engines": {
     "node": ">=22 <25"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
   },
   "bin": {
     "contextgraph": "./bin/contextgraph"
@@ -15,7 +22,8 @@
     "check": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "contextgraph": "node dist/cli/main.js"
+    "contextgraph": "node dist/cli/main.js",
+    "prepack": "npm run build"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.13.0",

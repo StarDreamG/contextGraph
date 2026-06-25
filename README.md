@@ -21,9 +21,21 @@ ContextGraph 不是 Markdown 文档管理器、云知识库、向量数据库、
 
 第一版不会上传任何数据，不会调用远程 LLM，不会打开网络端口。
 
-## 本地开发安装
+## 安装
 
-在本仓库内安装依赖并构建：
+通过 npm 全局安装：
+
+```bash
+npm install -g @stardreamg/contextgraph
+```
+
+也可以临时运行：
+
+```bash
+npx @stardreamg/contextgraph status
+```
+
+本仓库开发时安装依赖并构建：
 
 ```bash
 npm install
@@ -43,11 +55,12 @@ contextgraph init
 contextgraph index
 contextgraph status
 contextgraph doctor
+contextgraph brief
 contextgraph query "测试"
 contextgraph handoff --agent codex --task "实现功能" --summary "完成实现，已运行 npm test" --files "src/example.ts"
 ```
 
-当前本机开发入口通过 `bin/contextgraph` 固定使用 Node v24.14.1，避免在不同项目目录下因为 Node 版本漂移导致 `better-sqlite3` 原生模块 ABI 不匹配。后续迭代只需要在本仓库运行 `npm run build`，全局 `contextgraph` 命令会继续指向最新构建产物。
+包入口不绑定本机绝对路径，会优先使用安装目录同级的 Node.js，减少全局安装 Node 与当前项目目录 Node 不一致导致的原生模块 ABI 问题。发布前通过 `npm pack --dry-run` 检查包内容。本地 `npm link` 后，后续迭代只需要在本仓库运行 `npm run build`，全局 `contextgraph` 命令会继续指向最新构建产物。
 
 也可以不 link，直接使用仓库内 npm script：
 
@@ -61,6 +74,7 @@ npm run contextgraph -- status
 - `index`：扫描配置的 sources，脱敏内容，生成 blocks、nodes、FTS 和状态。
 - `status`：显示新鲜度和可信度。
 - `doctor`：检查 Node、SQLite 原生依赖、项目初始化状态和索引健康度。
+- `brief`：为新 Agent 输出最高优先级的开工摘要。
 - `query`：搜索相关项目上下文。
 - `handoff`：记录 Agent 会话交接摘要。
 - `mcp`：启动本地 stdio MCP Server，可通过 `--project <path>` 指定项目根目录。
@@ -81,6 +95,25 @@ npm run contextgraph -- status
 - `fixed_by`：失败经验指向修复方案。
 
 查询结果会优先返回高优先级节点，并显示 `Priority` 和原因。
+
+## Brief
+
+`brief` 面向新 Agent 开工前阅读：
+
+```bash
+contextgraph brief
+contextgraph brief --project /path/to/project
+```
+
+输出分组包括：
+
+- `P0 Must Know`
+- `P1 Required Workflow`
+- `P1 Known Pitfalls`
+- `P2 Project Shape`
+- `Tool Profile`
+
+当前 `Tool Profile` 仍是占位信息，后续由历史 session 导入和项目工具环境画像填充。
 
 ## 安全策略
 
