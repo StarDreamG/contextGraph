@@ -32,6 +32,14 @@ describe("CLI e2e", () => {
       const status = await execFileAsync("node", [cli, "status"], { cwd: project.root });
       expect(status.stdout).toContain("Status:");
 
+      const doctor = await execFileAsync("node", [cli, "doctor", "--project", project.root], { cwd: project.root });
+      expect(doctor.stdout).toContain("ContextGraph Doctor");
+      expect(doctor.stdout).toContain("Project initialized: yes");
+      expect(doctor.stdout).toContain("Index status:        Fresh");
+
+      const mcpHelp = await execFileAsync("node", [cli, "mcp", "--help"], { cwd: project.root });
+      expect(mcpHelp.stdout).toContain("--project <path>");
+
       const query = await execFileAsync("node", [cli, "query", "测试"], { cwd: project.root });
       expect(query.stdout).toContain("Relevant Context:");
 

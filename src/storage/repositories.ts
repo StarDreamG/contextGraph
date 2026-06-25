@@ -1,4 +1,4 @@
-import type { BlockRecord, NodeRecord, SourceRecord, StatusSnapshot } from "../types/domain.js";
+import type { BlockRecord, EdgeRecord, NodeRecord, SourceRecord, StatusSnapshot } from "../types/domain.js";
 import type { ContextGraphDatabase } from "./database.js";
 
 function json(value: unknown): string {
@@ -33,7 +33,7 @@ export class GraphRepository {
       .run({ ...source, metadata: json(source.metadata) });
   }
 
-  replaceBlocksAndNodes(sourceId: string, blocks: BlockRecord[], nodes: NodeRecord[]): void {
+  replaceBlocksNodesAndEdges(sourceId: string, blocks: BlockRecord[], nodes: NodeRecord[], edges: EdgeRecord[]): void {
     this.db
       .prepare(
         `DELETE FROM nodes_fts
@@ -50,6 +50,10 @@ export class GraphRepository {
       `INSERT INTO nodes (id, type, title, content, source_id, block_id, confidence, status, metadata, created_at, updated_at)
        VALUES (@id, @type, @title, @content, @sourceId, @blockId, @confidence, @status, @metadata, @createdAt, @updatedAt)`
     );
+    const insertEdge = this.db.prepare(
+      `INSERT INTO edges (id, from_node, to_node, relation, confidence, metadata, created_at)
+       VALUES (@id, @fromNode, @toNode, @relation, @confidence, @metadata, @createdAt)`
+    );
     const insertFts = this.db.prepare("INSERT INTO nodes_fts (node_id, title, content) VALUES (?, ?, ?)");
 
     for (const block of blocks) {
@@ -59,6 +63,10 @@ export class GraphRepository {
     for (const node of nodes) {
       insertNode.run({ ...node, metadata: json(node.metadata) });
       insertFts.run(node.id, node.title, node.content);
+    }
+
+    for (const edge of edges) {
+      insertEdge.run({ ...edge, metadata: json(edge.metadata) });
     }
   }
 

@@ -14,6 +14,7 @@ export type NodeType =
 
 export type GraphStatus = "Fresh" | "Stale";
 export type Reliability = "High" | "Medium" | "Low";
+export type Priority = "P0" | "P1" | "P2" | "P3" | "P4";
 
 export interface PrivacyConfig {
   offline: true;
@@ -67,10 +68,22 @@ export interface NodeRecord {
   updatedAt: string;
 }
 
+export interface EdgeRecord {
+  id: string;
+  fromNode: string;
+  toNode: string;
+  relation: string;
+  confidence: number;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+}
+
 export interface QueryResult {
   type: NodeType;
   title: string;
   content: string;
+  priority: Priority;
+  priorityReason: string;
   sourcePath: string | null;
   startLine: number | null;
   endLine: number | null;
@@ -80,6 +93,7 @@ export interface QueryResult {
 }
 
 export interface StatusSnapshot {
+  indexVersion?: number;
   status: GraphStatus;
   reliability: Reliability;
   lastIndexedAt: string | null;

@@ -5,6 +5,7 @@ import { loadConfig } from "../config/loadConfig.js";
 import { currentGitHead } from "../git/gitState.js";
 import { classifyBlock } from "../indexing/classifier.js";
 import { sha256, stableId } from "../indexing/hash.js";
+import { buildEdgesForBlock } from "../indexing/relationships.js";
 import { scanSources } from "../indexing/scanner.js";
 import { parseJsonBlocks } from "../parsing/json.js";
 import { parseMarkdownBlocks } from "../parsing/markdown.js";
@@ -15,6 +16,8 @@ import { openDatabase } from "../storage/database.js";
 import { GraphRepository } from "../storage/repositories.js";
 import { migrate } from "../storage/schema.js";
 import type { BlockRecord, NodeRecord, SourceRecord, StatusSnapshot } from "../types/domain.js";
+
+const CURRENT_INDEX_VERSION = 2;
 
 export interface IndexResult {
   sourcesScanned: number;
@@ -44,10 +47,13 @@ export async function indexContextGraph(projectRoot: string): Promise<IndexResul
   migrate(db);
   const repository = new GraphRepository(db);
   const existingSources = readExistingSources(db);
+  const storedIndexVersion = readStatusValue<number>(db, "indexVersion", 0);
+  const shouldRebuildDerivedData = storedIndexVersion < CURRENT_INDEX_VERSION;
   const seenSourceIds = new Set<string>();
   let sourcesChanged = 0;
   let blocksIndexed = 0;
   let nodesCreated = 0;
+  let edgesCreated = 0;
 
   repository.transaction(() => {
     for (const relativePath of sourcePaths) {
@@ -58,7 +64,7 @@ export async function indexContextGraph(projectRoot: string): Promise<IndexResul
       const sourceId = stableId("source", relativePath);
       seenSourceIds.add(sourceId);
 
-      if (existingSources.get(sourceId)?.hash === sourceHash) {
+      if (!shouldRebuildDerivedData && existingSources.get(sourceId)?.hash === sourceHash) {
         continue;
       }
 
@@ -74,17 +80,27 @@ export async function indexContextGraph(projectRoot: string): Promise<IndexResul
         metadata: {}
       };
       const blocks = toBlockRecords(source, parsedBlocks, lastIndexedAt);
-      const nodes = blocks.flatMap((block) => toNodeRecords(block, classifyBlock({
-        title: block.title,
-        content: block.content,
-        sourceId: block.sourceId,
-        blockId: block.id
-      }), lastIndexedAt));
+      const nodesByBlock = blocks.map((block) => ({
+        block,
+        nodes: toNodeRecords(
+          block,
+          classifyBlock({
+            title: block.title,
+            content: block.content,
+            sourceId: block.sourceId,
+            blockId: block.id
+          }),
+          lastIndexedAt
+        )
+      }));
+      const nodes = nodesByBlock.flatMap((entry) => entry.nodes);
+      const edges = nodesByBlock.flatMap((entry) => buildEdgesForBlock(entry.nodes, lastIndexedAt));
 
       repository.upsertSource(source);
-      repository.replaceBlocksAndNodes(source.id, blocks, nodes);
+      repository.replaceBlocksNodesAndEdges(source.id, blocks, nodes, edges);
       blocksIndexed += blocks.length;
       nodesCreated += nodes.length;
+      edgesCreated += edges.length;
     }
 
     repository.deleteSourcesExcept([...seenSourceIds]);
@@ -92,6 +108,7 @@ export async function indexContextGraph(projectRoot: string): Promise<IndexResul
 
   const counts = repository.counts();
   const snapshot: StatusSnapshot = {
+    indexVersion: CURRENT_INDEX_VERSION,
     status: "Fresh",
     reliability: "High",
     lastIndexedAt,
@@ -117,7 +134,7 @@ export async function indexContextGraph(projectRoot: string): Promise<IndexResul
     blocksIndexed,
     nodesCreated,
     nodesUpdated: 0,
-    edgesCreated: 0,
+    edgesCreated,
     currentHead,
     indexedHead: currentHead,
     lastIndexedAt,
@@ -128,6 +145,14 @@ export async function indexContextGraph(projectRoot: string): Promise<IndexResul
 function readExistingSources(db: ReturnType<typeof openDatabase>): Map<string, ExistingSource> {
   const rows = db.prepare("SELECT id, path, hash FROM sources").all() as ExistingSource[];
   return new Map(rows.map((row) => [row.id, row]));
+}
+
+function readStatusValue<T>(db: ReturnType<typeof openDatabase>, key: string, fallback: T): T {
+  const row = db.prepare("SELECT value FROM status WHERE key = ?").get(key) as { value: string } | undefined;
+  if (!row) {
+    return fallback;
+  }
+  return JSON.parse(row.value) as T;
 }
 
 function parseSource(relativePath: string, content: string): ParsedBlock[] {

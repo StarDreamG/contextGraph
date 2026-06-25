@@ -27,4 +27,23 @@ describe("query", () => {
       await project.cleanup();
     }
   });
+
+  it("returns high priority rules ahead of ordinary notes", async () => {
+    const project = await createTempProject();
+    try {
+      await writeFile(
+        path.join(project.root, "AGENTS.md"),
+        "## 安全规约\n本项目禁止接入互联网，必须离线处理。\n\n## 背景\n互联网访问只是背景描述。\n"
+      );
+      await initContextGraph(project.root);
+      await indexContextGraph(project.root);
+
+      const result = await queryContext(project.root, "禁止 互联网");
+
+      expect(result.results[0]?.priority).toBe("P0");
+      expect(result.results[0]?.type).toBe("Rule");
+    } finally {
+      await project.cleanup();
+    }
+  });
 });

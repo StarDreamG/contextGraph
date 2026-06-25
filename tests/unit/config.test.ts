@@ -50,6 +50,8 @@ describe("default config", () => {
     expect(DEFAULT_CONFIG.sources).toContain("**/pom.xml");
     expect(DEFAULT_CONFIG.ignore).toContain(".env");
     expect(DEFAULT_CONFIG.ignore).toContain("**/.contextgraph/**");
+    expect(DEFAULT_CONFIG.ignore).toContain("**/.local/**");
+    expect(DEFAULT_CONFIG.ignore).toContain("**/*.pyc");
   });
 
   it("contains agent instructions for status, index, query, and handoff", () => {

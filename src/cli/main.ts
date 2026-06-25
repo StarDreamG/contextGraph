@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command } from "commander";
+import { registerDoctorCommand } from "../commands/doctorCommand.js";
 import { registerHandoffCommand } from "../commands/handoffCommand.js";
 import { registerIndexCommand } from "../commands/indexCommand.js";
 import { registerInitCommand } from "../commands/initCommand.js";
@@ -13,6 +14,7 @@ export function buildProgram(): Command {
   registerInitCommand(program);
   registerIndexCommand(program);
   registerStatusCommand(program);
+  registerDoctorCommand(program);
   registerQueryCommand(program);
   registerHandoffCommand(program);
   registerMcpCommand(program);

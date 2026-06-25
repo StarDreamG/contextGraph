@@ -23,6 +23,9 @@ describe("handoff", () => {
       const db = new Database(path.join(project.root, ".contextgraph", "graph.db"));
       const sessions = db.prepare("SELECT COUNT(*) AS count FROM sessions").get() as { count: number };
       expect(sessions.count).toBe(1);
+      const nodes = db.prepare("SELECT type, metadata FROM nodes").all() as Array<{ type: string; metadata: string }>;
+      const failure = nodes.find((node) => node.type === "Failure");
+      expect(failure ? JSON.parse(failure.metadata).priority : undefined).toBe("P1");
       db.close();
     } finally {
       await project.cleanup();

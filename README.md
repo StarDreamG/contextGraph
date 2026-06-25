@@ -42,6 +42,7 @@ npm link
 contextgraph init
 contextgraph index
 contextgraph status
+contextgraph doctor
 contextgraph query "测试"
 contextgraph handoff --agent codex --task "实现功能" --summary "完成实现，已运行 npm test" --files "src/example.ts"
 ```
@@ -59,9 +60,27 @@ npm run contextgraph -- status
 - `init`：创建 `.contextgraph`、`graph.db`、配置、状态文件和 AGENTS.md 指引。
 - `index`：扫描配置的 sources，脱敏内容，生成 blocks、nodes、FTS 和状态。
 - `status`：显示新鲜度和可信度。
+- `doctor`：检查 Node、SQLite 原生依赖、项目初始化状态和索引健康度。
 - `query`：搜索相关项目上下文。
 - `handoff`：记录 Agent 会话交接摘要。
-- `mcp`：启动本地 stdio MCP Server。
+- `mcp`：启动本地 stdio MCP Server，可通过 `--project <path>` 指定项目根目录。
+
+## 图谱产物
+
+`index` 会为节点写入优先级，并建立基础边关系：
+
+- `P0`：强制禁令、安全/联网/账号/生产规则，例如“禁止接入互联网”。
+- `P1`：必跑测试、踩坑经验、失败和修复方案。
+- `P2`：业务决策、环境说明、流程和偏好。
+- `P3`：普通说明。
+- `P4`：模板或低信号内容。
+
+当前边关系包括：
+
+- `co_occurs_with`：同一上下文 block 内共同出现。
+- `fixed_by`：失败经验指向修复方案。
+
+查询结果会优先返回高优先级节点，并显示 `Priority` 和原因。
 
 ## 安全策略
 
@@ -81,12 +100,18 @@ ContextGraph 默认 local-first：
 contextgraph mcp
 ```
 
+指定项目根目录：
+
+```bash
+contextgraph mcp --project /path/to/project
+```
+
 stdio MCP 配置可以使用同一个全局命令：
 
 ```json
 {
   "command": "contextgraph",
-  "args": ["mcp"]
+  "args": ["mcp", "--project", "/path/to/project"]
 }
 ```
 

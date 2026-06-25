@@ -26,6 +26,7 @@ export function registerQueryCommand(program: Command): void {
           ? `${result.sourcePath}:${result.startLine ?? "?"}-${result.endLine ?? "?"}`
           : "unknown";
         console.log(`[${result.type}] ${result.title}`);
+        console.log(`Priority: ${result.priority} (${result.priorityReason})`);
         console.log(`Source: ${source}`);
         console.log(`Confidence: ${result.confidence}`);
         console.log(`Status: ${result.status}`);
