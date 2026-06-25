@@ -18,12 +18,22 @@ describe("CLI e2e", () => {
       publishConfig?: Record<string, string>;
     };
     const wrapper = await readFile(path.resolve("bin/contextgraph"), "utf8");
+    const oldLocalNodePath = [
+      "/Users",
+      "apple",
+      ".nvm",
+      "versions",
+      "node",
+      "v24.14.1",
+      "bin",
+      "node"
+    ].join("/");
 
     expect(packageJson.name).toBe("@stardreamg/contextgraph");
     expect(packageJson.private).not.toBe(true);
     expect(packageJson.bin?.contextgraph).toBe("./bin/contextgraph");
     expect(wrapper).toContain("#!/usr/bin/env bash");
-    expect(wrapper).not.toContain("/Users/apple/.nvm/versions/node/v24.14.1/bin/node");
+    expect(wrapper).not.toContain(oldLocalNodePath);
     expect(wrapper).toContain("dist/cli/main.js");
     expect(wrapper).toContain('NODE_BIN="$INVOKED_DIR/node"');
     expect(packageJson.files).toEqual(expect.arrayContaining(["bin", "dist", "README.md"]));

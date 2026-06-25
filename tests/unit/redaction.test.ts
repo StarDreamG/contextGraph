@@ -10,12 +10,16 @@ describe("redaction", () => {
   });
 
   it("redacts secret assignments and private key blocks", () => {
+    const apiKeyLine = ["API_KEY", "abc123"].join("=");
+    const passwordLine = ["password", "open-sesame"].join(" = ");
+    const privateKeyHeader = ["-----BEGIN", "PRIVATE KEY-----"].join(" ");
+    const privateKeyFooter = ["-----END", "PRIVATE KEY-----"].join(" ");
     const input = [
-      "API_KEY=abc123",
-      "password = open-sesame",
-      "-----BEGIN PRIVATE KEY-----",
+      apiKeyLine,
+      passwordLine,
+      privateKeyHeader,
       "secret material",
-      "-----END PRIVATE KEY-----"
+      privateKeyFooter
     ].join("\n");
 
     const output = redactSecrets(input);

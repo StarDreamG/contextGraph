@@ -396,12 +396,16 @@ describe("redaction", () => {
   });
 
   it("redacts secret assignments and private key blocks", () => {
+    const apiKeyLine = ["API_KEY", "abc123"].join("=");
+    const passwordLine = ["password", "open-sesame"].join(" = ");
+    const privateKeyHeader = ["-----BEGIN", "PRIVATE KEY-----"].join(" ");
+    const privateKeyFooter = ["-----END", "PRIVATE KEY-----"].join(" ");
     const input = [
-      "API_KEY=abc123",
-      "password = open-sesame",
-      "-----BEGIN PRIVATE KEY-----",
+      apiKeyLine,
+      passwordLine,
+      privateKeyHeader,
       "secret material",
-      "-----END PRIVATE KEY-----"
+      privateKeyFooter
     ].join("\n");
     const output = redactSecrets(input);
     expect(output).not.toContain("abc123");
@@ -1782,7 +1786,7 @@ Run:
 
 ```bash
 git status --short
-rg -n "API_KEY=|SECRET=|TOKEN=|PRIVATE KEY|password=|passwd=" .
+rg -n "(API[_-]?KEY|SECRET|TOKEN|PRIVATE KEY|PASSWORD|PASSWD)" .
 ```
 
 Expected: no `.contextgraph/graph.db`, `.contextgraph/status.json`, `node_modules`, or secret values are staged or committed.
@@ -1807,11 +1811,12 @@ Run:
 tmpdir="$(mktemp -d)"
 git -C "$tmpdir" init -b main
 printf '## 测试\n必须运行 npm test\n' > "$tmpdir/AGENTS.md"
-(cd "$tmpdir" && node /Users/apple/personal/contextGraph/dist/cli/main.js init)
-(cd "$tmpdir" && node /Users/apple/personal/contextGraph/dist/cli/main.js index)
-(cd "$tmpdir" && node /Users/apple/personal/contextGraph/dist/cli/main.js status)
-(cd "$tmpdir" && node /Users/apple/personal/contextGraph/dist/cli/main.js query "测试")
-(cd "$tmpdir" && node /Users/apple/personal/contextGraph/dist/cli/main.js handoff --agent codex --task "测试" --summary "fix failed test" --files "AGENTS.md")
+CONTEXTGRAPH_CLI="<repo>/dist/cli/main.js"
+(cd "$tmpdir" && node "$CONTEXTGRAPH_CLI" init)
+(cd "$tmpdir" && node "$CONTEXTGRAPH_CLI" index)
+(cd "$tmpdir" && node "$CONTEXTGRAPH_CLI" status)
+(cd "$tmpdir" && node "$CONTEXTGRAPH_CLI" query "测试")
+(cd "$tmpdir" && node "$CONTEXTGRAPH_CLI" handoff --agent codex --task "测试" --summary "fix failed test" --files "AGENTS.md")
 ```
 
 Expected: init, index, status, query, and handoff all succeed. Remove the temp directory after verification.
