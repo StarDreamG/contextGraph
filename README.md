@@ -21,7 +21,7 @@ ContextGraph 不是 Markdown 文档管理器、云知识库、向量数据库、
 
 第一版不会上传任何数据，不会调用远程 LLM，不会打开网络端口。
 
-## 本地运行
+## 本地开发安装
 
 在本仓库内安装依赖并构建：
 
@@ -30,17 +30,29 @@ npm install
 npm run build
 ```
 
-通过仓库内 npm script 运行：
+开发期推荐把本仓库链接成本机命令：
 
 ```bash
-npm run contextgraph -- init
-npm run contextgraph -- index
-npm run contextgraph -- status
-npm run contextgraph -- query "测试"
-npm run contextgraph -- handoff --agent codex --task "实现功能" --summary "完成实现，已运行 npm test" --files "src/example.ts"
+npm link
 ```
 
-不需要全局安装 npm 包，也不需要 `npm link`。
+之后任意已初始化项目目录都可以直接运行：
+
+```bash
+contextgraph init
+contextgraph index
+contextgraph status
+contextgraph query "测试"
+contextgraph handoff --agent codex --task "实现功能" --summary "完成实现，已运行 npm test" --files "src/example.ts"
+```
+
+当前本机开发入口通过 `bin/contextgraph` 固定使用 Node v24.14.1，避免在不同项目目录下因为 Node 版本漂移导致 `better-sqlite3` 原生模块 ABI 不匹配。后续迭代只需要在本仓库运行 `npm run build`，全局 `contextgraph` 命令会继续指向最新构建产物。
+
+也可以不 link，直接使用仓库内 npm script：
+
+```bash
+npm run contextgraph -- status
+```
 
 ## 命令
 
@@ -66,7 +78,16 @@ ContextGraph 默认 local-first：
 启动 MCP Server：
 
 ```bash
-npm run contextgraph -- mcp
+contextgraph mcp
+```
+
+stdio MCP 配置可以使用同一个全局命令：
+
+```json
+{
+  "command": "contextgraph",
+  "args": ["mcp"]
+}
 ```
 
 MVP 暴露两个工具：

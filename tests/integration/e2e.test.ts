@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
@@ -8,6 +8,17 @@ import { createTempProject } from "../helpers/project.js";
 const execFileAsync = promisify(execFile);
 
 describe("CLI e2e", () => {
+  it("exposes a stable development wrapper as the package binary", async () => {
+    const packageJson = JSON.parse(await readFile(path.resolve("package.json"), "utf8")) as {
+      bin?: Record<string, string>;
+    };
+    const wrapper = await readFile(path.resolve("bin/contextgraph"), "utf8");
+
+    expect(packageJson.bin?.contextgraph).toBe("./bin/contextgraph");
+    expect(wrapper).toContain("/Users/apple/.nvm/versions/node/v24.14.1/bin/node");
+    expect(wrapper).toContain("dist/cli/main.js");
+  });
+
   it("runs init, index, status, query, and handoff from the built CLI", async () => {
     const project = await createTempProject();
     try {
