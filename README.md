@@ -146,6 +146,8 @@ ContextGraph 默认 local-first：
 
 详细阶段计划见 [ROADMAP.md](./ROADMAP.md)，后续开发设计见 [docs/dev-plan.md](./docs/dev-plan.md)。
 
+下一阶段会优先补齐真实试用中暴露的基础体验：MCP 长进程状态刷新、`reload_contextgraph`、更清晰的 MCP 诊断，以及 `basic` / `project` / `source` 索引 preset，避免默认索引过窄或源码索引失控。
+
 ## MCP
 
 启动 MCP Server：

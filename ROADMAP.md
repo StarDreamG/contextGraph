@@ -19,6 +19,23 @@ ContextGraph 的方向是从关键词索引升级为语义上下文索引。升�
 
 Level 0 后续还要继续加固中文 trigram 片段检索、query 结果字段和 status 可靠性展示，但不能引入模型硬依赖。
 
+## Next Priority: MCP Lifecycle And Index Presets
+
+一次真实项目试用暴露出几个比 embedding 更靠前的开箱即用问题。它们属于 Level 0 hardening，必须在语义索引扩展前优先处理：
+
+- MCP server 由 IDE 作为长期 stdio 进程管理。如果 IDE 启动 MCP 时项目尚未 `init`，后续 CLI 完成 `init` / `index` 后，MCP 仍可能停留在旧状态。
+- MCP tool 需要在每次调用时重新检测 `.contextgraph/config.json`、`.contextgraph/graph.db` 和 `lastIndexedAt`，不能把启动时的失败状态当成永久状态。
+- MCP 需要提供明确诊断：当前 `projectRoot`、`dbPath`、数据库是否存在、`lastIndexedAt`、索引新鲜度、建议执行的命令，以及是否可能需要 IDE 重启。
+- MCP 应增加显式 reload 能力，例如 `reload_contextgraph`，用于重新读取配置和数据库状态。
+- CLI 与 MCP 必须保持状态一致：CLI 已经能读到的初始化和索引结果，MCP 不应继续报告未初始化。
+- 默认索引范围需要从单一 sources 列表升级为 preset：`basic` / `project` / `source`。
+- `basic` 保持轻量，覆盖 README、AGENTS、docs、规则、测试和关键配置。
+- `project` 面向新 Agent 开箱即用，补充常见项目入口、路由、服务端代理、部署配置和脚本。
+- `source` 才允许扩展到源码全量或大范围索引，并必须有规模提示、强排除规则和可回退配置。
+- source 索引必须避免扫入低价值或高噪声内容，例如 `node_modules`、构建产物、锁文件、生成文件、大型静态资源、二进制文件和历史数据库。
+
+这些修复的验收目标是：用户完成 `contextgraph init && contextgraph index` 后，无论通过 CLI 还是 MCP 查询，都能得到一致、可解释、可恢复的状态。
+
 ## Level 1: Embedding Mode
 
 目标：在 Level 0 之上增加可选本地 embedding，让 ContextGraph 支持 semantic search 和 hybrid search。
@@ -135,6 +152,10 @@ Overall reliability:  Medium
 后续实现每一阶段前都必须满足：
 
 - 不启用 embedding / extractor 时，现有功能完全正常。
+- MCP 启动早于项目初始化时，后续 `init` / `index` 后能通过 lazy reload 或显式 reload 恢复。
+- MCP status 能说明当前项目路径、数据库路径、初始化状态、索引时间和下一步建议。
+- 默认 indexing preset 不会意外扫入整个源码树；大范围 source 索引必须显式启用。
+- source preset 必须有规模提示、排除规则和测试覆盖。
 - 启用 embedding 后，只对新增或变更 block 生成向量。
 - `block_hash` 不变时，不重复计算 embedding。
 - 启用 extractor 后，只处理高价值 block。
