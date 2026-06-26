@@ -29,6 +29,8 @@ Level 0 后续还要继续加固中文 trigram 片段检索、query 结果字段
 - MCP 应增加显式 reload 能力，例如 `reload_contextgraph`，用于重新读取配置和数据库状态。
 - CLI 与 MCP 必须保持状态一致：CLI 已经能读到的初始化和索引结果，MCP 不应继续报告未初始化。
 - 默认索引范围需要从单一 sources 列表升级为 preset：`basic` / `project` / `source`。
+- `init` / `index` 应具备 project detector，根据目录结构和标志文件自动识别 JS/Vue/Node、Python、Java/Maven、Go、Rust 等项目类型，并选择更合适的默认 include。
+- framework-aware defaults 要覆盖项目关键入口。例如 JS/Vue 项目应自动纳入 `src/**/*.{js,ts,vue,jsx,tsx}`、`server/**/*.{js,ts,mjs,cjs}`、`scripts/**/*.{js,ts,mjs,cjs}`、`vite.config.*`、`package.json`、`Dockerfile*`、`docker-compose*.yml`、`bruno/**/*` 和 `tests/**/*`。
 - `basic` 保持轻量，覆盖 README、AGENTS、docs、规则、测试和关键配置。
 - `project` 面向新 Agent 开箱即用，补充常见项目入口、路由、服务端代理、部署配置和脚本。
 - `source` 才允许扩展到源码全量或大范围索引，并必须有规模提示、强排除规则和可回退配置。
@@ -154,6 +156,8 @@ Overall reliability:  Medium
 - 不启用 embedding / extractor 时，现有功能完全正常。
 - MCP 启动早于项目初始化时，后续 `init` / `index` 后能通过 lazy reload 或显式 reload 恢复。
 - MCP status 能说明当前项目路径、数据库路径、初始化状态、索引时间和下一步建议。
+- project detector 能根据常见标志文件和目录结构自动选择适合的默认扫描范围。
+- JS/Vue/Node 项目在不手动编辑 sources 的情况下也能索引到有效项目入口和源码上下文。
 - 默认 indexing preset 不会意外扫入整个源码树；大范围 source 索引必须显式启用。
 - source preset 必须有规模提示、排除规则和测试覆盖。
 - 启用 embedding 后，只对新增或变更 block 生成向量。

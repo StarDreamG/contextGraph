@@ -31,6 +31,7 @@ Observed symptoms:
 - `contextgraph init` and `contextgraph index` can succeed in the terminal while the IDE-managed MCP server still reports an uninitialized project.
 - CLI reads the latest `.contextgraph/graph.db` because it is a short-lived process, but MCP may be a long-running stdio process that started before `.contextgraph` existed.
 - Initial queries may return little useful project shape because the default source set focuses on docs, tests, rules, and configuration rather than source code.
+- Static defaults do not adapt to project type. For example, a JS/Vue project may require `src/**/*.vue`, `server/**/*.js`, Vite config, Docker Compose files, and Bruno API tests before the index becomes useful.
 - Expanding sources manually to include broad source globs can index thousands of files and create a much larger database, which raises noise, performance, and storage concerns.
 
 Required design response:
@@ -42,8 +43,9 @@ Required design response:
 - Add clear diagnostics when reload is impossible because the IDE owns process lifecycle.
 - Keep CLI and MCP state semantics aligned: if CLI status is fresh, MCP should either show the same state or explain why the MCP process cannot refresh.
 - Replace the single default source-list mindset with indexing presets: `basic`, `project`, and `source`.
+- Add a project detector that chooses framework-aware defaults from marker files and directories instead of requiring an agent to edit raw globs.
 - `basic` should remain small and safe.
-- `project` should improve new-agent onboarding with common source entrypoints and deployment/runtime files.
+- `project` should improve new-agent onboarding with common source entrypoints, framework files, deployment/runtime files, and test/API fixtures.
 - `source` should be explicit, bounded, and guarded by ignore rules plus scale warnings.
 
 This work is still Level 0: it must not introduce model providers, network calls, vector databases, or query-time LLM use.
@@ -314,11 +316,34 @@ If MCP cannot recover because the host keeps an old stopped process or stale too
 
 Indexing should become profile-driven instead of requiring users to manually edit raw source globs.
 
+Before expanding presets, ContextGraph should detect the project shape from marker files and directories:
+
+- JS/Node/Vue: `package.json`, `vite.config.*`, `src/`, `server/`, `bruno/`, `docker-compose*.yml`
+- Python: `pyproject.toml`, `requirements.txt`, `src/`, `app/`, `tests/`
+- Java/Maven: `pom.xml`, `src/main`, `src/test`
+- Go: `go.mod`, `cmd/`, `internal/`, `pkg/`
+- Rust: `Cargo.toml`, `src/`
+- Docs-heavy or agent-rule-only repositories: `README.md`, `AGENTS.md`, `docs/`
+
 Presets:
 
 - `basic`: README, AGENTS/CLAUDE, docs, Cursor rules, tests, package/build metadata, handoff/session summaries.
-- `project`: `basic` plus common application entrypoints, routing, API/proxy files, deployment files, scripts, and top-level source summaries.
+- `project`: `basic` plus detector-selected application entrypoints, routing, API/proxy files, deployment files, scripts, framework configs, and top-level source summaries.
 - `source`: controlled broad source indexing for code-heavy exploration.
+
+Example JS/Vue `project` defaults:
+
+- `src/**/*.{js,ts,vue,jsx,tsx}`
+- `server/**/*.{js,ts,mjs,cjs}`
+- `scripts/**/*.{js,ts,mjs,cjs}`
+- `tests/**/*`
+- `bruno/**/*`
+- `vite.config.*`
+- `package.json`
+- `Dockerfile*`
+- `docker-compose*.yml`
+
+Detector-selected defaults should be explainable. `contextgraph status` or `doctor` should show the detected project type, selected preset, and the source globs that came from the detector.
 
 The `source` preset must include scale protections:
 
@@ -341,6 +366,8 @@ The config shape can evolve toward:
 ```
 
 Raw `sources` and `ignore` arrays may remain as advanced overrides, but presets should be the normal user-facing control.
+
+If detection confidence is low, ContextGraph should choose `basic`, show a warning, and suggest candidate presets instead of guessing a broad source scan.
 
 ## Status Reliability Panel
 
@@ -406,10 +433,12 @@ Do not build these in the next phase:
 
 3. Index preset hardening
    - add `basic`, `project`, and `source` presets
+   - add project detector for JS/Node/Vue, Python, Java/Maven, Go, Rust, and docs-heavy repositories
+   - add framework-aware default includes for detected project types
    - keep default indexing safe and useful for new-agent onboarding
    - require explicit source preset for broad code indexing
    - add scale warnings and stronger excludes
-   - add tests for preset expansion and large-project guardrails
+   - add tests for project detection, preset expansion, and large-project guardrails
 
 4. Embedding interface and state
    - add config shape
@@ -448,12 +477,14 @@ Future implementation work must satisfy:
 1. Not enabling embedding or extractor leaves all current commands working.
 2. MCP started before `init` can recover after `init` / `index` through lazy refresh or `reload_contextgraph`.
 3. MCP diagnostics clearly explain project path, database path, initialization state, index freshness, and required next action.
-4. Default indexing does not unexpectedly scan an entire source tree.
-5. Broad source indexing is an explicit preset with scale warnings and strong excludes.
-6. Enabling embedding only computes vectors for new or changed blocks.
-7. Unchanged `block_hash` values do not trigger repeated embedding.
-8. Enabling extractor only processes high-value blocks.
-9. Provider failures downgrade to base query instead of breaking `query`.
-10. Status clearly separates Context index, Embedding index, and Extractor index freshness.
-11. Query results include source, line range, confidence, and status.
-12. Every new feature has focused tests.
+4. Project detection selects useful defaults for common stacks without manual source editing.
+5. JS/Vue/Node projects index meaningful app entrypoints under the `project` preset without scanning dependencies or build output.
+6. Default indexing does not unexpectedly scan an entire source tree.
+7. Broad source indexing is an explicit preset with scale warnings and strong excludes.
+8. Enabling embedding only computes vectors for new or changed blocks.
+9. Unchanged `block_hash` values do not trigger repeated embedding.
+10. Enabling extractor only processes high-value blocks.
+11. Provider failures downgrade to base query instead of breaking `query`.
+12. Status clearly separates Context index, Embedding index, and Extractor index freshness.
+13. Query results include source, line range, confidence, and status.
+14. Every new feature has focused tests.
