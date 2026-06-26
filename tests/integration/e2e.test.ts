@@ -31,7 +31,7 @@ describe("CLI e2e", () => {
 
     expect(packageJson.name).toBe("@stardreamg/contextgraph");
     expect(packageJson.private).not.toBe(true);
-    expect(packageJson.bin?.contextgraph).toBe("./bin/contextgraph");
+    expect(packageJson.bin?.contextgraph).toBe("bin/contextgraph");
     expect(wrapper).toContain("#!/usr/bin/env bash");
     expect(wrapper).not.toContain(oldLocalNodePath);
     expect(wrapper).toContain("dist/cli/main.js");
