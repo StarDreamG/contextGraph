@@ -28,6 +28,32 @@ ContextGraph 不是低配 CodeGraph，也不应该进入完整源码解析、符
 
 下一阶段允许 ContextGraph 关联源码路径、模块名和测试命令，但这只是把经验节点落到具体文件或模块上，不是解析源码语义。目标是回答“这个文件/模块相关的项目经验、规则、风险和测试是什么”，而不是回答“这个函数被谁调用”。
 
+## v0.2 Priority: Experience Domains And Trust Semantics
+
+v0.2 需要把 ContextGraph 从“能搜到经验块”推进到“能围绕任务组织经验视野”。区块链维护案例是目标场景：非区块链工程师维护多客户链上集成时，必须先看到边界、端点、txid 规则、废弃文档和历史失败模式，再改代码。
+
+新增概念：
+
+- `Knowledge Domain`：项目经验所属领域，例如 `blockchain`、`deployment`、`testing`、`frontend`、`backend`。
+- `Priority`：先收敛到 `P0` / `P1` / `P2`。P0 Rule 是强约束，查询和 brief 中必须优先展示。
+- `Status`：经验事实状态扩展为 `confirmed`、`candidate`、`deprecated`、`conflict`、`stale`。
+- `EnvironmentFact`：保存环境地址、用途、source、`last_verified_at` 和 `status`，用于部署、链服务、测试环境、客户环境等信息。
+- `supersedes`：新文档、新 handoff 或新规则替代旧文档或旧规则。
+
+Task-aware retrieval:
+
+- `query` / `brief` 应根据任务文本自动识别 domain。
+- `contextgraph brief "<task>"` 输出：
+  - `P0 Rules`
+  - `Current Source of Truth`
+  - `Environment Facts`
+  - `Required Flow`
+  - `Required Tests`
+  - `Deprecated Docs`
+  - `Known Failure Modes`
+  - `Related Files`
+- AGENTS.md 是入口，ContextGraph 是经验索引和全局视图。AGENTS.md 应告诉 Agent 使用 ContextGraph，ContextGraph 则负责按任务返回可溯源、带优先级和新鲜度的全局经验。
+
 ## Next Priority: MCP Lifecycle And Index Presets
 
 一次真实项目试用暴露出几个比 embedding 更靠前的开箱即用问题。它们属于 Level 0 hardening，必须在语义索引扩展前优先处理：
@@ -52,7 +78,7 @@ ContextGraph 不是低配 CodeGraph，也不应该进入完整源码解析、符
 
 ## Level 1: Embedding Mode
 
-目标：在 Level 0 之上增加可选本地 embedding，让 ContextGraph 支持 semantic search 和 hybrid search。
+目标：在 Level 0 之上增加可选本地 embedding，让 ContextGraph 支持 semantic search、hybrid search 和 project experience blocks 之间的 candidate semantic edges。
 
 命令规划：
 
@@ -76,9 +102,14 @@ Provider 预留：
 
 - embedding 默认关闭。
 - embedding provider 不可用时，query 自动降级到 Level 0。
-- `block_hash` 不变时不重复生成向量。
+- 每个 block / node 生成 embedding，并与 `block_hash` 绑定缓存。
+- 对新增或变更 block，只计算该 block embedding。
 - 向量写入本地 SQLite，不依赖外部向量数据库。
 - npm 包不内置模型文件。
+- 索引后，对相似度超过阈值的 block 建立 candidate edge。
+- candidate edge 不等同 confirmed edge，必须带 score、provider、model、status。
+- 新增 candidate edge 类型：`SEMANTICALLY_RELATED`、`SAME_DOMAIN`、`MAY_APPLY_TO`、`POSSIBLY_CONFLICTS`、`POSSIBLY_REINFORCES`。
+- confirmed edge 只能来自显式规则、用户确认、handoff 明确说明、测试验证或 LLM extractor 结构化判断。
 
 ## Level 2: Local LLM Extract Mode
 
@@ -132,6 +163,9 @@ Context index:    Fresh
 Embedding:        enabled / disabled / stale / failed
 Embedding model:  bge-m3
 Pending embeds:   12
+Pending semantic edge blocks: 4
+Candidate edges:  128
+Confirmed edges:  42
 Extractor:        enabled / disabled / stale / failed
 Extractor model:  qwen2.5:7b
 Pending extracts: 3
@@ -176,6 +210,8 @@ Overall reliability:  Medium
 - `query --file` / `query --module` 能返回关联的规则、失败、修复、测试要求和 handoff，并标明这些是经验关联，不是代码调用链。
 - 启用 embedding 后，只对新增或变更 block 生成向量。
 - `block_hash` 不变时，不重复计算 embedding。
+- embedding 能为相似 project experience blocks 建立 candidate semantic edges，并在 status 中展示候选边数量、confirmed 边数量和待处理 block 数。
+- candidate semantic edge 不得被当作 confirmed rule 或 confirmed relationship。
 - 启用 extractor 后，只处理高价值 block。
 - provider 不可用时，基础 query 自动降级。
 - status 明确显示 Context index / Embedding index / Extractor index 的新鲜度。

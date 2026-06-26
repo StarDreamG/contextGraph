@@ -8,6 +8,8 @@ ContextGraph must remain a project experience index, not a source-code knowledge
 
 The product opportunity is to stop coding agents from treating a local README or a single grep hit as the whole project. ContextGraph should show the broader operational memory around a task, with priority, provenance, freshness, and reliability.
 
+AGENTS.md should remain the human-readable entrypoint for agents. ContextGraph is the indexed global view behind that entrypoint: it stores small, traceable, queryable experience blocks and tells agents whether those blocks are current enough to trust.
+
 ## Architecture Levels
 
 ### Level 0: Base Mode
@@ -65,6 +67,7 @@ Level 1 adds optional semantic search:
 - incremental embedding by `block_hash`
 - semantic search over cached vectors
 - hybrid search: FTS + trigram + embedding
+- candidate semantic edge discovery between project experience blocks
 - provider failure fallback to Level 0
 
 Commands:
@@ -84,6 +87,8 @@ Provider ids:
 - `openai-compatible-local-endpoint`
 
 The first implementation slice should add config, schema, CLI status, provider interface, and pending work detection before adding full provider integrations.
+
+Embedding is not only for query-time semantic recall. It should also build candidate semantic edges between existing project experience blocks after indexing. These edges help graph expansion surface context that a narrow grep/read loop would miss.
 
 ### Level 2: Local LLM Extract Mode
 
@@ -171,6 +176,36 @@ CREATE TABLE IF NOT EXISTS embeddings (
 );
 ```
 
+Candidate semantic edge storage:
+
+```sql
+CREATE TABLE IF NOT EXISTS semantic_edges (
+  id TEXT PRIMARY KEY,
+  from_block_id TEXT NOT NULL,
+  to_block_id TEXT NOT NULL,
+  from_node_id TEXT,
+  to_node_id TEXT,
+  relation TEXT NOT NULL,
+  score REAL NOT NULL,
+  provider TEXT NOT NULL,
+  model TEXT NOT NULL,
+  status TEXT NOT NULL,
+  block_hash_pair TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+```
+
+Allowed candidate relations:
+
+- `SEMANTICALLY_RELATED`
+- `SAME_DOMAIN`
+- `MAY_APPLY_TO`
+- `POSSIBLY_CONFLICTS`
+- `POSSIBLY_REINFORCES`
+
+Candidate semantic edges are not confirmed graph truth. They must include `score`, `provider`, `model`, and `status`, and query/brief output must label them as candidates when used for expansion.
+
 Extractor storage should be added when Level 2 begins:
 
 ```sql
@@ -186,6 +221,24 @@ CREATE TABLE IF NOT EXISTS extracted_items (
   block_hash TEXT NOT NULL,
   confidence REAL NOT NULL,
   status TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+```
+
+Environment facts can start as structured nodes plus metadata, but the target table is:
+
+```sql
+CREATE TABLE IF NOT EXISTS environment_facts (
+  id TEXT PRIMARY KEY,
+  domain TEXT NOT NULL,
+  name TEXT NOT NULL,
+  address TEXT NOT NULL,
+  purpose TEXT NOT NULL,
+  source_block_id TEXT NOT NULL,
+  last_verified_at TEXT,
+  status TEXT NOT NULL,
+  confidence REAL NOT NULL,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -269,6 +322,69 @@ Extractor should only process blocks that match at least one signal:
 
 This selector must be deterministic and test-covered before LLM provider integration.
 
+## Knowledge Domain And Trust Model
+
+Knowledge Domain organizes project experience by task area. Initial domains should include:
+
+- `blockchain`
+- `deployment`
+- `testing`
+- `frontend`
+- `backend`
+
+The domain detector should use deterministic signals first:
+
+- task text
+- headings and source paths
+- file path prefixes
+- known environment names
+- test command names
+- explicit tags in frontmatter or handoff metadata
+
+`query` and `brief` should infer the most likely domain from the task and use it as a ranking boost, not as a hard filter. P0 Rules remain globally important and must be shown before lower-priority same-domain context.
+
+Priority:
+
+- `P0`: hard rules, safety constraints, source-of-truth boundaries, production/account/network/security constraints, and non-negotiable project rules.
+- `P1`: required flows, required tests, known failure modes, fixes, and high-risk operational context.
+- `P2`: useful decisions, conventions, environment notes, project shape, and supporting context.
+
+Status:
+
+- `confirmed`: explicit project rule, handoff statement, verified test requirement, manual note, approved extractor item, or user-confirmed relationship.
+- `candidate`: deterministic extraction, embedding edge discovery, or unapproved LLM extractor output.
+- `deprecated`: superseded documentation, old process, or known obsolete environment fact.
+- `conflict`: competing facts or rules cannot both be true.
+- `stale`: source is out of date, unverified for too long, or not aligned with current Git/context index.
+
+`supersedes` should connect newer documents, handoffs, environment facts, and rules to the older items they replace. Deprecated items should still be searchable, but brief/query must clearly mark them and avoid treating them as current source of truth.
+
+## Task-Aware Brief Plan
+
+Add task-aware brief:
+
+```bash
+contextgraph brief "维护多客户区块链集成"
+```
+
+The command should infer Knowledge Domain, then assemble:
+
+- `P0 Rules`
+- `Current Source of Truth`
+- `Environment Facts`
+- `Required Flow`
+- `Required Tests`
+- `Deprecated Docs`
+- `Known Failure Modes`
+- `Related Files`
+
+Blockchain example:
+
+- A non-blockchain engineer maintaining blockchain integration across multiple clients should retrieve boundaries, endpoints, txid rules, deprecated docs, failure modes, related files, and required tests before changing code.
+- The brief must distinguish confirmed rules from candidate relationships.
+- Environment facts should include address, purpose, source, `last_verified_at`, and status.
+- Deprecated docs should be included only as warnings, especially when `supersedes` points to a current source of truth.
+
 ## Query Plan
 
 `contextgraph query` must never call a model at request time.
@@ -281,10 +397,46 @@ FTS5 hits
 + embedding similarity hits
 -> merge and deduplicate
 -> score by priority, confidence, freshness, source quality, and match score
--> return source, line range, confidence, status, and reliability warnings
+-> graph expansion:
+   - always pull linked P0 rules
+   - pull required tests
+   - pull environment facts
+   - pull failures and fixes
+   - pull deprecated docs as warnings
+   - pull source-of-truth and supersedes chains
+-> return source, line range, domain, priority, confidence, status, freshness, and reliability warnings
 ```
 
 If embedding is disabled, stale, or failed, query continues with FTS + trigram. If extractor is disabled, query still returns Level 0 nodes and blocks.
+
+Candidate semantic edges may expand recall, but they must not upgrade a candidate fact into a confirmed fact. Confirmed edges can only come from explicit rules, user confirmation, handoff statements, test verification, or structured LLM extractor output that passes schema validation and approval rules.
+
+## Embedding Candidate Edge Discovery
+
+After embeddings are available, ContextGraph should discover semantic edges incrementally:
+
+1. Generate embedding for each new or changed block/node.
+2. Bind embedding cache to `block_hash`.
+3. For a new or changed block, compare only the relevant candidate neighborhood instead of recomputing the whole graph.
+4. If similarity exceeds a configured threshold, create or update a candidate semantic edge.
+5. Store `score`, `provider`, `model`, `status`, and `block_hash_pair`.
+6. Mark edges stale when either side's `block_hash` changes.
+
+Candidate edge types:
+
+- `SEMANTICALLY_RELATED`: two experience blocks discuss similar concepts.
+- `SAME_DOMAIN`: two blocks likely belong to the same Knowledge Domain.
+- `MAY_APPLY_TO`: a rule or failure may apply to a file/module/domain.
+- `POSSIBLY_CONFLICTS`: two blocks may disagree.
+- `POSSIBLY_REINFORCES`: two blocks likely support the same rule or workflow.
+
+Confirmed edge sources remain stricter:
+
+- explicit rule syntax or deterministic path/test extraction
+- user confirmation
+- handoff explicit statement
+- test verification
+- LLM extractor structured judgment, stored as validated output with governance status
 
 ## MCP Lifecycle Plan
 
@@ -434,6 +586,9 @@ Context index:        Fresh
 Embedding index:      Stale
 Embedding model:      bge-m3
 Pending embeds:       12
+Pending semantic edge blocks: 3
+Candidate edges:      128
+Confirmed edges:      42
 Extractor index:      Disabled
 Extractor model:      qwen2.5:7b
 Pending extracts:     3
@@ -446,6 +601,8 @@ Reliability rules:
 - `High`: context index fresh, enabled derived indexes fresh, no critical failures.
 - `Medium`: context index fresh but embedding or extractor stale/disabled for a mode that requested them.
 - `Low`: context index stale, schema unavailable, or core index failed.
+
+The status panel must make freshness part of the trust layer. It should report Context index freshness, Embedding index freshness, Candidate edge count, Confirmed edge count, and Pending semantic edge blocks.
 
 ## Security Requirements
 
@@ -504,31 +661,49 @@ Do not build these in the next phase:
    - keep relationship output explicit that it is project-experience context, not code intelligence
    - add tests for path extraction, test command extraction, file query, and module query
 
-5. Embedding interface and state
+5. Knowledge domain, trust semantics, and task-aware brief
+   - add Knowledge Domain metadata and deterministic domain detection
+   - support initial domains: `blockchain`, `deployment`, `testing`, `frontend`, `backend`
+   - normalize priority around `P0`, `P1`, and `P2` for brief/query
+   - add status semantics: `confirmed`, `candidate`, `deprecated`, `conflict`, `stale`
+   - add `supersedes` relation and deprecated-doc handling
+   - add `EnvironmentFact`
+   - add `contextgraph brief "<task>"`
+   - add tests for P0-first ordering, domain inference, status rendering, and supersedes behavior
+
+6. Embedding interface and state
    - add config shape
    - add `embeddings` table
    - add `contextgraph embedding status`
    - add stale and pending calculations
    - add tests proving disabled mode preserves existing behavior
 
-6. Embedding execution
+7. Embedding semantic edge discovery
+   - generate embeddings for blocks/nodes and bind them to `block_hash`
+   - compute embeddings only for new or changed blocks
+   - create candidate semantic edges above configured thresholds
+   - add edge status, score, provider, and model fields
+   - show Embedding freshness, Candidate edge count, Confirmed edge count, and Pending semantic edge blocks in status
+   - add tests proving candidate edges do not become confirmed edges
+
+8. Embedding execution
    - add first provider implementation behind explicit enablement
    - add incremental embedding by `block_hash`
    - add rebuild command
    - add hybrid score merge
 
-7. Extractor interface and high-value selector
+9. Extractor interface and high-value selector
    - add deterministic selector
    - add extractor config and status
    - add schema validation
    - add tests for selector and provider failure fallback
 
-8. Extractor execution
+10. Extractor execution
    - add first provider implementation behind explicit enablement
    - store candidate extracted items
    - expose candidate items in brief/query without treating them as confirmed
 
-9. Governance
+11. Governance
    - conflict detection
    - stale rule detection
    - required tests recommendation
@@ -547,10 +722,16 @@ Future implementation work must satisfy:
 7. Broad source indexing is an explicit preset with scale warnings and strong excludes.
 8. ContextGraph documentation and command output clearly state that it complements, rather than replaces, CodeGraph, Sourcegraph, LSP, and IDE indexes.
 9. File/module scoped queries return related rules, failures, fixes, test requirements, and handoffs without claiming code call-graph knowledge.
-10. Enabling embedding only computes vectors for new or changed blocks.
-11. Unchanged `block_hash` values do not trigger repeated embedding.
-12. Enabling extractor only processes high-value blocks.
-13. Provider failures downgrade to base query instead of breaking `query`.
-14. Status clearly separates Context index, Embedding index, and Extractor index freshness.
-15. Query results include source, line range, confidence, and status.
-16. Every new feature has focused tests.
+10. Knowledge Domain inference can route a blockchain, deployment, testing, frontend, or backend task toward relevant experience without hiding global P0 rules.
+11. `contextgraph brief "<task>"` returns P0 Rules, Current Source of Truth, Environment Facts, Required Flow, Required Tests, Deprecated Docs, Known Failure Modes, and Related Files.
+12. Environment facts include address, purpose, source, `last_verified_at`, status, confidence, and domain.
+13. Superseded docs are marked `deprecated` and linked to current source of truth.
+14. Enabling embedding only computes vectors for new or changed blocks.
+15. Unchanged `block_hash` values do not trigger repeated embedding.
+16. Embedding discovery creates candidate semantic edges with score, provider, model, and status.
+17. Candidate semantic edges never count as confirmed edges without explicit confirmation, handoff evidence, test verification, or validated extractor judgment.
+18. Enabling extractor only processes high-value blocks.
+19. Provider failures downgrade to base query instead of breaking `query`.
+20. Status clearly separates Context index, Embedding index, Extractor index, Candidate edge count, Confirmed edge count, and Pending semantic edge blocks.
+21. Query results include source, line range, domain, priority, confidence, status, and freshness.
+22. Every new feature has focused tests.

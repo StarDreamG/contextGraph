@@ -36,6 +36,8 @@ ContextGraph 不和 CodeGraph 抢同一层：
 - CodeGraph / Sourcegraph / LSP / IDE indexes 适合处理代码事实：类、函数、符号引用、调用链、接口实现和模块依赖。
 - ContextGraph 处理项目经验事实：agent 指令、团队规约、历史踩坑、修复经验、测试要求、部署约束、handoff、决策、环境说明和模型/agent 使用约定。
 
+AGENTS.md 是 Agent 的入口说明，ContextGraph 是入口背后的经验索引和全局视图。Agent 可以先读 AGENTS.md 获得开工约束，再通过 ContextGraph 查询当前任务相关的经验事实、新鲜度和优先级。
+
 ## 它不是什么
 
 ContextGraph 不是 source-code knowledge graph，不替代 CodeGraph、Sourcegraph、LSP、IDE 索引或 tree-sitter 级源码解析。它不负责回答“这个方法有哪些调用方”“这个 Spring Bean 怎么注入”“这个 interface 有哪些实现”这类代码结构问题。
@@ -127,6 +129,43 @@ npm run contextgraph -- status
 
 这样 Agent 可以查询“这个文件/模块相关的项目经验是什么”，同时继续把调用链、符号和实现关系交给 CodeGraph / LSP。
 
+## Knowledge Domains
+
+后续版本会引入 Knowledge Domain，把项目经验按任务领域组织，例如：
+
+- `blockchain`
+- `deployment`
+- `testing`
+- `frontend`
+- `backend`
+
+`query` / `brief` 会根据任务文本自动识别 domain，并优先召回该 domain 下的 P0/P1/P2 经验。P0 Rule 必须在结果中优先展示。
+
+节点和边的状态语义会扩展为：
+
+- `confirmed`：来自明确规约、人工记录、handoff、测试验证或可靠结构化抽取。
+- `candidate`：自动抽取或 embedding 发现的候选事实，需要审阅。
+- `deprecated`：旧文档或旧流程，不应作为当前依据。
+- `conflict`：与其他规则或事实存在冲突。
+- `stale`：来源已过期、Git HEAD 不一致或长时间未验证。
+
+后续会增加 `supersedes` 关系，用于标记新文档、新 handoff 或新规则替代旧文档。
+
+## Example: Blockchain Maintenance
+
+A non-blockchain engineer maintaining blockchain integration across multiple clients uses ContextGraph to retrieve boundaries, endpoints, txid rules, deprecated docs, and failure modes before changing code.
+
+在这个场景里，Agent 不应该只 grep 到一段 README 就开始改链上集成逻辑。它应该先通过 ContextGraph 获取：
+
+- `P0 Rules`：哪些边界不能碰，例如 txid 规则、链上回执格式、客户侧隔离要求。
+- `Current Source of Truth`：当前可信文档、handoff 或 verified note。
+- `Environment Facts`：链服务地址、用途、来源、最近验证时间和状态。
+- `Required Flow`：提交、轮询、回写、验证的必经步骤。
+- `Required Tests`：改动后必须跑的测试或人工验收。
+- `Deprecated Docs`：已被新文档或 handoff 替代的旧说明。
+- `Known Failure Modes`：历史上发生过的超时、重复提交、txid 丢失、缓存误判等问题。
+- `Related Files`：相关代码文件、配置文件和测试文件。
+
 ## Brief
 
 `brief` 面向新 Agent 开工前阅读：
@@ -136,15 +175,24 @@ contextgraph brief
 contextgraph brief --project /path/to/project
 ```
 
+后续会支持 task-aware brief：
+
+```bash
+contextgraph brief "维护多客户区块链集成"
+```
+
 输出分组包括：
 
-- `P0 Must Know`
-- `P1 Required Workflow`
-- `P1 Known Pitfalls`
-- `P2 Project Shape`
-- `Tool Profile`
+- `P0 Rules`
+- `Current Source of Truth`
+- `Environment Facts`
+- `Required Flow`
+- `Required Tests`
+- `Deprecated Docs`
+- `Known Failure Modes`
+- `Related Files`
 
-当前 `Tool Profile` 仍是占位信息，后续由历史 session 导入和项目工具环境画像填充。
+项目工具环境画像后续会从历史 session 导入中补齐，并进入 `Environment Facts`、`Required Flow` 和 `Required Tests` 等分组。
 
 ## 安全策略
 
@@ -161,9 +209,11 @@ ContextGraph 默认 local-first：
 下一阶段目标是从关键词索引升级为语义上下文索引，但继续保持轻量、可选、可降级。
 
 - `Level 0 基础模式`：Markdown / JSON / Text parser、SQLite、FTS5、中文片段检索、status、query、MCP、handoff。未启用任何模型能力时，这一层必须独立可用。
-- `Level 1 Embedding 模式`：在 Level 0 上增加可选本地 embedding、semantic search 和 hybrid search。embedding 不作为默认硬依赖。
+- `Level 1 Embedding 模式`：在 Level 0 上增加可选本地 embedding、semantic search、hybrid search 和 candidate semantic edge discovery。embedding 不作为默认硬依赖。
 - `Level 2 本地 LLM Extract 模式`：只对高价值 block、handoff、session summary 做结构化抽取，生成 Rule、Failure、Fix、Decision、TestRequirement、Risk。抽取结果默认是 `candidate`，不能直接当作 confirmed 规则。
 - `Level 3 Governance 模式`：规则冲突检测、过期规则检测、修改前风险提示、required tests 推荐和 stale context warning。
+
+FTS finds text. Embedding connects experience blocks. Graph expansion gives agents the full project context. Status tells whether the context is trustworthy.
 
 所有模型能力都必须满足：
 
