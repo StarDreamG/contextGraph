@@ -11,9 +11,13 @@ describe("CLI e2e", () => {
   it("exposes publishable package metadata and a portable binary wrapper", async () => {
     const packageJson = JSON.parse(await readFile(path.resolve("package.json"), "utf8")) as {
       name?: string;
+      version?: string;
       private?: boolean;
       bin?: Record<string, string>;
       files?: string[];
+      license?: string;
+      main?: string;
+      exports?: Record<string, string>;
       scripts?: Record<string, string>;
       publishConfig?: Record<string, string>;
     };
@@ -30,15 +34,30 @@ describe("CLI e2e", () => {
     ].join("/");
 
     expect(packageJson.name).toBe("@stardreamg/contextgraph");
+    expect(packageJson.version).toBe("0.1.1");
     expect(packageJson.private).not.toBe(true);
-    expect(packageJson.bin?.contextgraph).toBe("./bin/contextgraph");
+    expect(packageJson.license).toBe("Apache-2.0");
+    expect(packageJson.main).toBe("dist/cli/main.js");
+    expect(packageJson.exports?.["."]).toBe("./dist/cli/main.js");
+    expect(packageJson.bin?.contextgraph).toBe("bin/contextgraph");
     expect(wrapper).toContain("#!/usr/bin/env bash");
     expect(wrapper).not.toContain(oldLocalNodePath);
     expect(wrapper).toContain("dist/cli/main.js");
     expect(wrapper).toContain('NODE_BIN="$INVOKED_DIR/node"');
-    expect(packageJson.files).toEqual(expect.arrayContaining(["bin", "dist", "README.md"]));
+    expect(packageJson.files).toEqual(["bin", "dist", "README.md", "LICENSE"]);
     expect(packageJson.scripts?.prepack).toBe("npm run build");
     expect(packageJson.publishConfig?.access).toBe("public");
+  });
+
+  it("prints the package version with --version and -V", async () => {
+    const packageJson = JSON.parse(await readFile(path.resolve("package.json"), "utf8")) as { version?: string };
+    const cli = path.resolve("dist/cli/main.js");
+
+    const longVersion = await execFileAsync("node", [cli, "--version"]);
+    const shortVersion = await execFileAsync("node", [cli, "-V"]);
+
+    expect(longVersion.stdout.trim()).toBe(packageJson.version);
+    expect(shortVersion.stdout.trim()).toBe(packageJson.version);
   });
 
   it("runs init, index, status, query, and handoff from the built CLI", async () => {

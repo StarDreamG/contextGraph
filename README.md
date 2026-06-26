@@ -125,6 +125,27 @@ ContextGraph 默认 local-first：
 - 默认忽略 `.env`、私钥、证书、依赖目录、构建产物、Git 内部文件和 `.contextgraph/graph.db`。
 - 写入数据库前会脱敏疑似 API Key、Secret、Token、Password、Passphrase 和私钥区块。
 
+## 后续路线：语义上下文索引
+
+下一阶段目标是从关键词索引升级为语义上下文索引，但继续保持轻量、可选、可降级。
+
+- `Level 0 基础模式`：Markdown / JSON / Text parser、SQLite、FTS5、中文片段检索、status、query、MCP、handoff。未启用任何模型能力时，这一层必须独立可用。
+- `Level 1 Embedding 模式`：在 Level 0 上增加可选本地 embedding、semantic search 和 hybrid search。embedding 不作为默认硬依赖。
+- `Level 2 本地 LLM Extract 模式`：只对高价值 block、handoff、session summary 做结构化抽取，生成 Rule、Failure、Fix、Decision、TestRequirement、Risk。抽取结果默认是 `candidate`，不能直接当作 confirmed 规则。
+- `Level 3 Governance 模式`：规则冲突检测、过期规则检测、修改前风险提示、required tests 推荐和 stale context warning。
+
+所有模型能力都必须满足：
+
+- 增量执行：`block_hash` 不变时不重新 embedding，不重新 LLM extract。
+- 可缓存：embedding 和 extract 结果写入本地 SQLite，并绑定 block hash。
+- 可跳过：未启用 provider 时，ContextGraph 仍可正常工作。
+- 可降级：provider 不可用时自动降级到 FTS / 中文片段检索。
+- 查询时不跑模型：`contextgraph query` 只能读取已有索引，不能现场调用 LLM。
+- 本地优先：默认不联网、不上传、不调用远程 LLM。
+- 模型不内置：npm 包不打包 embedding 模型或 LLM 模型。
+
+详细阶段计划见 [ROADMAP.md](./ROADMAP.md)，后续开发设计见 [docs/dev-plan.md](./docs/dev-plan.md)。
+
 ## MCP
 
 启动 MCP Server：
@@ -162,31 +183,7 @@ MCP 使用 stdio。日志和诊断信息写入 stderr，stdout 保留给 MCP 协
 历史 session 导入是必做的 Phase 2。它应该通过显式、脱敏、可审计、摘要优先的流程导入现有项目相关 Codex sessions，让已有项目初始化后立刻有可查询的历史经验。
 
 Phase 2 还必须建立项目工具环境画像。它要从历史 sessions 和本地配置中抽取这个项目常用或曾经失败的 MCP servers、skills、插件/连接器、浏览器/Playwright 自动化、文档/PDF/表格工具和测试工具，让新 Agent 能知道开工前该加载哪些能力。
-# contextGraph
 
-contextGraph 是一个项目上下文记录和跨项目、跨 Agent 共享的底层工具，目的是在 AI 编程和自动化流程中记录和保留项目信息，使不同的 AI Agent 甚至不同的模型之间也能延续一个项目的上下文。
+## License
 
-## 目标
-
-- 持久化项目背景、环境变量、部署配置、关键决策等信息，以图谱形式保存。
-- 支持多个 AI Agent 共享同一项目的上下文，避免重复沟通。
-- 导入和导出历史会话内容，方便长周期任务和中断后恢复。
-- 与自动化部署流程打通，让原型转换为可上线产品时自动生成配置信息。
-
-## 分阶段计划
-
-1. **阶段1**：构建核心数据结构，提供最小命令行工具，用于初始化和更新项目上下文。
-2. **阶段2**：支持导入历史对话内容，适配多个 AI Agent，提供图谱可视化。
-3. **阶段3**：与自动部署平台整合，在需要切换模型或 Agent 时自动接续项目上下文。
-
-## 使用方法
-
-项目处于早期开发阶段，更多设计思路和计划请参见 [docs](./docs/) 目录。
-
-## 贡献
-
-欢迎任何形式的贡献！如果你希望参与讨论或提交代码，请先通过 Issues 或 Pull Request 联系我们。
-
-## 许可证
-
-本项目使用 MIT 许可证，详见 [LICENSE](LICENSE)。
+License: Apache-2.0. See [LICENSE](LICENSE).
