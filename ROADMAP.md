@@ -19,6 +19,23 @@ ContextGraph 的方向是从关键词索引升级为语义上下文索引。升�
 
 Level 0 后续还要继续加固中文 trigram 片段检索、query 结果字段和 status 可靠性展示，但不能引入模型硬依赖。
 
+## v0.1.x: Query Planner Lite
+
+当前阶段目标是修复 MCP 自然语言查询对关键词组合敏感的问题。ContextGraph does not make agents better at grep. It removes the need for agents to guess the right grep query.
+
+能力范围：
+
+- `normalizeQuery`
+- intent inference
+- entity extraction: terms、numbers、ports、ips、files、configKeys
+- query expansion
+- FTS / trigram multi-query retrieval
+- deduplicate + rerank
+- zero-result fallback with query plan and suggestions
+- `contextgraph explain-query "<query>"`
+
+MCP 的 `get_relevant_context` 不允许只执行一次 raw FTS。它必须基于 query plan 多路召回，并在 expanded query 命中时标注 matched query。
+
 ## Product Boundary: Project Experience Facts
 
 ContextGraph 不是低配 CodeGraph，也不应该进入完整源码解析、符号表和调用链赛道。
@@ -132,8 +149,11 @@ Extractor 只处理高价值 block，不处理全量内容。高价值判断包�
 - 包含“决定 / decision / ADR / 采用 / 选择”
 - 来自 handoff / session summary
 - 来自 AGENTS.md / CLAUDE.md / Cursor rules / docs/failures.md / docs/decisions.md
+- 来自 docs/deployment.md
+- 包含“测试 / test / playwright / junit / bruno”
+- 包含“生产 / 部署 / IP / 端口 / nginx / docker”
 
-抽取结果必须是结构化 JSON，并通过 schema 校验。默认 `status` 为 `candidate`，未来通过 `contextgraph approve` 提升为 `confirmed`。
+抽取结果必须是结构化 JSON，并通过 schema 校验。目标类型包括 Rule、Failure、Fix、Decision、TestRequirement、Risk 和 EnvironmentFact。默认 `status` 为 `candidate`，未来通过 `contextgraph approve` 提升为 `confirmed`。
 
 核心限制：
 
@@ -142,6 +162,7 @@ Extractor 只处理高价值 block，不处理全量内容。高价值判断包�
 - 远程 provider 必须显式开启。
 - `contextgraph query` 禁止实时调用 LLM。
 - provider 不可用时不影响 Level 0 查询。
+- query 时禁止实时调用 LLM 理解全库；LLM 只在 index、handoff、rebuild 或 background extraction 时运行。
 
 ## Level 3: Governance Mode
 
@@ -208,6 +229,8 @@ Overall reliability:  Medium
 - source preset 必须有规模提示、排除规则和测试覆盖。
 - README 和命令输出必须明确：ContextGraph 是项目经验事实层，不替代 CodeGraph / Sourcegraph / LSP 的代码事实层。
 - `query --file` / `query --module` 能返回关联的规则、失败、修复、测试要求和 handoff，并标明这些是经验关联，不是代码调用链。
+- `explain-query` 能展示 normalize、intent、entities、expanded queries 和 retriever plan。
+- MCP 自然语言查询必须使用 Query Planner Lite，多路召回并在 expanded query 命中时返回 matched query。
 - 启用 embedding 后，只对新增或变更 block 生成向量。
 - `block_hash` 不变时，不重复计算 embedding。
 - embedding 能为相似 project experience blocks 建立 candidate semantic edges，并在 status 中展示候选边数量、confirmed 边数量和待处理 block 数。

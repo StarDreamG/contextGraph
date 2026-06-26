@@ -90,6 +90,8 @@ export interface QueryResult {
   confidence: number;
   status: string;
   rank: number;
+  matchedQuery?: string;
+  matchedByExpandedQuery?: boolean;
 }
 
 export interface StatusSnapshot {

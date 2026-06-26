@@ -82,6 +82,7 @@ contextgraph status
 contextgraph doctor
 contextgraph brief
 contextgraph query "测试"
+contextgraph explain-query "智策星隔离要求，不能占用哪些端口和资源"
 contextgraph handoff --agent codex --task "实现功能" --summary "完成实现，已运行 npm test" --files "src/example.ts"
 ```
 
@@ -101,6 +102,7 @@ npm run contextgraph -- status
 - `doctor`：检查 Node、SQLite 原生依赖、项目初始化状态和索引健康度。
 - `brief`：为新 Agent 输出最高优先级的开工摘要。
 - `query`：搜索相关项目上下文。
+- `explain-query`：展示自然语言查询的 normalize、intent、entities 和 expanded queries。
 - `handoff`：记录 Agent 会话交接摘要。
 - `mcp`：启动本地 stdio MCP Server，可通过 `--project <path>` 指定项目根目录。
 
@@ -120,6 +122,27 @@ npm run contextgraph -- status
 - `fixed_by`：失败经验指向修复方案。
 
 查询结果会优先返回高优先级节点，并显示 `Priority` 和原因。
+
+`query` 和 MCP 的 `get_relevant_context` 不要求 Agent 猜中完美关键词。ContextGraph 会先生成轻量 query plan：
+
+```text
+natural language query
+-> normalize
+-> intent inference
+-> entity extraction
+-> query expansion
+-> FTS / trigram retrieval
+-> deduplicate + rerank
+-> source/status/freshness-aware results
+```
+
+如果原始查询没有直接命中，但 expanded query 命中，结果会标注：
+
+```text
+Matched by expanded query: 智策星 端口
+```
+
+如果所有查询都无结果，返回 query plan 和建议，而不是静默空结果。
 
 后续会补强“经验关联源码”的能力，但仍不把 ContextGraph 做成源码解析器。目标是从文档、handoff 和 session summary 中抽取文件路径、模块名和测试命令，建立：
 
@@ -208,12 +231,18 @@ ContextGraph 默认 local-first：
 
 下一阶段目标是从关键词索引升级为语义上下文索引，但继续保持轻量、可选、可降级。
 
+- `v0.1.x Query Planner Lite`：MCP 自然语言查询可靠性、query expansion、多路召回、zero-result fallback 和 `explain-query`。
+- `v0.2.x Embedding`：可选本地 embedding、hybrid search、semantic edge discovery 和 embedding status。
+- `v0.3.x Local LLM Extractor`：可选本地 LLM 结构化抽取 Rule / Failure / Fix / Decision / TestRequirement / Risk / EnvironmentFact，支持 conflict / stale / supersedes 推理和 candidate -> confirmed 工作流。
+
 - `Level 0 基础模式`：Markdown / JSON / Text parser、SQLite、FTS5、中文片段检索、status、query、MCP、handoff。未启用任何模型能力时，这一层必须独立可用。
 - `Level 1 Embedding 模式`：在 Level 0 上增加可选本地 embedding、semantic search、hybrid search 和 candidate semantic edge discovery。embedding 不作为默认硬依赖。
 - `Level 2 本地 LLM Extract 模式`：只对高价值 block、handoff、session summary 做结构化抽取，生成 Rule、Failure、Fix、Decision、TestRequirement、Risk。抽取结果默认是 `candidate`，不能直接当作 confirmed 规则。
 - `Level 3 Governance 模式`：规则冲突检测、过期规则检测、修改前风险提示、required tests 推荐和 stale context warning。
 
 FTS finds text. Embedding connects experience blocks. Graph expansion gives agents the full project context. Status tells whether the context is trustworthy.
+
+ContextGraph does not make agents better at grep. It removes the need for agents to guess the right grep query. Agents may ask in natural language; ContextGraph must turn that natural language into a reliable query plan, retrieve from multiple channels, expand through the experience graph, and return traceable, freshness-aware context.
 
 所有模型能力都必须满足：
 

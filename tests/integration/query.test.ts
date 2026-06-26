@@ -46,4 +46,53 @@ describe("query", () => {
       await project.cleanup();
     }
   });
+
+  it("uses expanded natural language queries when the original query has no direct matches", async () => {
+    const project = await createTempProject();
+    try {
+      await writeFile(
+        path.join(project.root, "AGENTS.md"),
+        [
+          "## 智策星隔离",
+          "智策星必须隔离运行。",
+          "端口 61192 已被占用，不得占用该端口和相关资源。"
+        ].join("\n")
+      );
+      await initContextGraph(project.root);
+      await indexContextGraph(project.root);
+
+      const result = await queryContext(project.root, "智策星隔离要求，不能占用哪些端口和资源");
+
+      expect(result.queryPlan.expandedQueries).toEqual(
+        expect.arrayContaining(["智策星 隔离", "智策星 端口", "智策星 资源", "不能占用 端口"])
+      );
+      expect(result.results.length).toBeGreaterThan(0);
+      expect(result.results.some((item) => item.sourcePath === "AGENTS.md")).toBe(true);
+      expect(result.results.some((item) => item.matchedQuery && item.matchedQuery !== result.query)).toBe(true);
+      expect(result.warnings).toContain("Original query had no direct matches. Returned results from expanded queries.");
+    } finally {
+      await project.cleanup();
+    }
+  });
+
+  it("returns query plan details and suggestions when all retrieval attempts miss", async () => {
+    const project = await createTempProject();
+    try {
+      await writeFile(path.join(project.root, "AGENTS.md"), "## 测试规范\n修改导出必须运行 npm test\n");
+      await initContextGraph(project.root);
+      await indexContextGraph(project.root);
+
+      const result = await queryContext(project.root, "完全不存在的客户隔离端口 65530");
+
+      expect(result.results).toHaveLength(0);
+      expect(result.queryPlan.normalizedQuery).toBe("完全不存在的客户隔离端口 65530");
+      expect(result.queryPlan.expandedQueries.length).toBeGreaterThan(0);
+      expect(result.warnings).toContain("No relevant context found.");
+      expect(result.suggestions).toEqual(
+        expect.arrayContaining(["try a shorter entity query", "try a known port/config/file name"])
+      );
+    } finally {
+      await project.cleanup();
+    }
+  });
 });

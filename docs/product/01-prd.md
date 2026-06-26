@@ -32,6 +32,10 @@ Idea → Product context → Issue → Implementation → PR → Review → Done
 - MCP 首期提供状态查询和相关上下文查询。
 
 ## Phase 2 Required Scope
+- 必须修复 MCP 自然语言查询对关键词组合敏感的问题。`get_relevant_context` 不能只执行 raw FTS，必须通过 Query Planner Lite 做 normalize、intent inference、entity extraction、query expansion、多路召回、去重和重排。
+- 必须支持 `contextgraph explain-query "<query>"`，用于解释自然语言查询如何被拆解和扩展。
+- 如果原始 query 无结果但 expanded query 有结果，必须返回 expanded query 命中的结果并标注 matched query。
+- 如果所有查询都无结果，必须返回 query plan 和建议，不能静默空结果。
 - 必须支持导入本机已有 Agent session，尤其是 Codex 历史 session。这是工具开箱即用的关键能力。
 - 导入必须按项目归属过滤，只导入与当前项目路径、Git remote、文件路径或明确任务上下文相关的 session。
 - 必须从历史 session 和本地项目上下文中抽取“项目工具环境画像”，包括该项目曾经加载或依赖过的 MCP server、skills、插件/连接器、浏览器自动化能力、测试工具和文档/表格/PDF 等工作能力。

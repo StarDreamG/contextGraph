@@ -28,6 +28,47 @@ Level 0 is the always-on foundation:
 
 This level must work without network access, model providers, vector databases, or background services.
 
+### Level 0.1: Query Planner Lite
+
+MCP natural language queries must not depend on agents guessing the exact grep/FTS terms.
+
+Current bug class:
+
+- A natural language query such as `智策星隔离要求，不能占用哪些端口和资源` can miss.
+- A shorter entity query such as `智策星隔离 61192` can hit.
+- Root cause: raw query text is too sensitive to punctuation, long Chinese phrases, synonym choice, and keyword grouping.
+
+Query Planner Lite flow:
+
+```text
+agent natural language query
+-> normalize
+-> intent inference
+-> entity extraction
+-> query expansion
+-> FTS / trigram multi-query retrieval
+-> deduplicate + rerank
+-> grouped context with source/status/freshness
+```
+
+Required module:
+
+```text
+src/query/queryPlanner.ts
+```
+
+Required functions:
+
+- `normalizeQuery(query)`
+- `extractEntities(query)`
+- `inferIntent(query)`
+- `expandQueries(query)`
+- `buildQueryPlan(query)`
+
+`get_relevant_context` must call `buildQueryPlan`, execute retrieval for expanded queries, merge results, deduplicate by source and line range, rerank, and include matched query metadata. If all retrieval channels miss, it must return the query plan plus suggestions instead of a silent empty result.
+
+`contextgraph explain-query "<query>"` should print Original Query, Normalized Query, Inferred Intents, Expected Types, Extracted Entities, Expanded Queries, and Retriever Plan.
+
 ### Level 0.5: MCP Lifecycle And Index Preset Hardening
 
 Real project usage showed that the next implementation slice should improve the base experience before adding embedding or extractor work.
@@ -122,13 +163,20 @@ Extractor output shape:
       "appliesTo": ["string"],
       "sourceBlockId": "string",
       "confidence": 0.0,
-      "status": "candidate"
+      "status": "candidate",
+      "relations": [
+        {
+          "target": "string",
+          "relation": "CONFLICTS | SUPERSEDES | REINFORCES | CAUSES | FIXED_BY | REQUIRES | VALIDATES",
+          "confidence": 0.0
+        }
+      ]
     }
   ]
 }
 ```
 
-Automatic extractor output defaults to `candidate`. Content from AGENTS.md, human notes, or explicit handoff records may receive higher confidence, but still should not become `confirmed` without an explicit approval path.
+Automatic extractor output defaults to `candidate`. Content from AGENTS.md, human notes, or explicit handoff records may receive higher confidence, but still should not become `confirmed` without an explicit approval path. LLM output must keep `sourceBlockId`, pass schema validation, and remain traceable to original text. Parse failures should discard that output and record a warning.
 
 ### Level 3: Governance Mode
 
@@ -156,6 +204,7 @@ Extractor rules:
 - If `block_hash` is unchanged for `(block_id, provider, model)`, skip extraction.
 - If a block is not high-value, do not enqueue it for extraction.
 - If provider fails, record failed status and keep Level 0 usable.
+- LLM extractors run only during index, handoff, rebuild, or background extraction, never during query-time full-project reasoning.
 
 ## SQLite Schema Plan
 
@@ -592,6 +641,9 @@ Confirmed edges:      42
 Extractor index:      Disabled
 Extractor model:      qwen2.5:7b
 Pending extracts:     3
+Candidate extracted nodes: 18
+Confirmed extracted nodes: 4
+Extraction failures:  0
 Search mode:          FTS + trigram / hybrid
 Overall reliability:  High / Medium / Low
 ```
@@ -637,14 +689,22 @@ Do not build these in the next phase:
    - ensure query results always include source, line range, confidence, and status
    - split status into Context / Embedding / Extractor sections with disabled defaults
 
-2. MCP lifecycle hardening
+2. Query Planner Lite
+   - add `src/query/queryPlanner.ts`
+   - add natural-language normalization, intent inference, entity extraction, and query expansion
+   - make `get_relevant_context` use multi-query retrieval instead of one raw FTS query
+   - add zero-result fallback with query plan and suggestions
+   - add `contextgraph explain-query "<query>"`
+   - add tests for `智策星隔离要求，不能占用哪些端口和资源`
+
+3. MCP lifecycle hardening
    - lazy re-check project initialization and database state on every MCP tool call
    - add `reload_contextgraph`
    - return projectRoot/dbPath/configPath/lastIndexedAt diagnostics from MCP status
    - provide actionable messages for `not initialized`, `not indexed`, `stale`, and `host restart required`
    - add tests for MCP started before init and then recovering after init/index
 
-3. Index preset hardening
+4. Index preset hardening
    - add `basic`, `project`, and `source` presets
    - add project detector for JS/Node/Vue, Python, Java/Maven, Go, Rust, and docs-heavy repositories
    - add framework-aware default includes for detected project types
@@ -653,7 +713,7 @@ Do not build these in the next phase:
    - add scale warnings and stronger excludes
    - add tests for project detection, preset expansion, and large-project guardrails
 
-4. Source association and scoped query
+5. Source association and scoped query
    - extract file paths, module names, and test commands from high-value context
    - add `RELATED_TO_FILE`, `APPLIES_TO`, `REQUIRES_TEST`, and `MENTIONS_MODULE` relations
    - add `contextgraph query --file <path>`
@@ -661,7 +721,7 @@ Do not build these in the next phase:
    - keep relationship output explicit that it is project-experience context, not code intelligence
    - add tests for path extraction, test command extraction, file query, and module query
 
-5. Knowledge domain, trust semantics, and task-aware brief
+6. Knowledge domain, trust semantics, and task-aware brief
    - add Knowledge Domain metadata and deterministic domain detection
    - support initial domains: `blockchain`, `deployment`, `testing`, `frontend`, `backend`
    - normalize priority around `P0`, `P1`, and `P2` for brief/query
@@ -671,14 +731,14 @@ Do not build these in the next phase:
    - add `contextgraph brief "<task>"`
    - add tests for P0-first ordering, domain inference, status rendering, and supersedes behavior
 
-6. Embedding interface and state
+7. Embedding interface and state
    - add config shape
    - add `embeddings` table
    - add `contextgraph embedding status`
    - add stale and pending calculations
    - add tests proving disabled mode preserves existing behavior
 
-7. Embedding semantic edge discovery
+8. Embedding semantic edge discovery
    - generate embeddings for blocks/nodes and bind them to `block_hash`
    - compute embeddings only for new or changed blocks
    - create candidate semantic edges above configured thresholds
@@ -686,24 +746,24 @@ Do not build these in the next phase:
    - show Embedding freshness, Candidate edge count, Confirmed edge count, and Pending semantic edge blocks in status
    - add tests proving candidate edges do not become confirmed edges
 
-8. Embedding execution
+9. Embedding execution
    - add first provider implementation behind explicit enablement
    - add incremental embedding by `block_hash`
    - add rebuild command
    - add hybrid score merge
 
-9. Extractor interface and high-value selector
+10. Extractor interface and high-value selector
    - add deterministic selector
    - add extractor config and status
    - add schema validation
    - add tests for selector and provider failure fallback
 
-10. Extractor execution
+11. Extractor execution
    - add first provider implementation behind explicit enablement
    - store candidate extracted items
    - expose candidate items in brief/query without treating them as confirmed
 
-11. Governance
+12. Governance
    - conflict detection
    - stale rule detection
    - required tests recommendation
@@ -716,22 +776,26 @@ Future implementation work must satisfy:
 1. Not enabling embedding or extractor leaves all current commands working.
 2. MCP started before `init` can recover after `init` / `index` through lazy refresh or `reload_contextgraph`.
 3. MCP diagnostics clearly explain project path, database path, initialization state, index freshness, and required next action.
-4. Project detection selects useful defaults for common stacks without manual source editing.
-5. JS/Vue/Node projects index meaningful app entrypoints under the `project` preset without scanning dependencies or build output.
-6. Default indexing does not unexpectedly scan an entire source tree.
-7. Broad source indexing is an explicit preset with scale warnings and strong excludes.
-8. ContextGraph documentation and command output clearly state that it complements, rather than replaces, CodeGraph, Sourcegraph, LSP, and IDE indexes.
-9. File/module scoped queries return related rules, failures, fixes, test requirements, and handoffs without claiming code call-graph knowledge.
-10. Knowledge Domain inference can route a blockchain, deployment, testing, frontend, or backend task toward relevant experience without hiding global P0 rules.
-11. `contextgraph brief "<task>"` returns P0 Rules, Current Source of Truth, Environment Facts, Required Flow, Required Tests, Deprecated Docs, Known Failure Modes, and Related Files.
-12. Environment facts include address, purpose, source, `last_verified_at`, status, confidence, and domain.
-13. Superseded docs are marked `deprecated` and linked to current source of truth.
-14. Enabling embedding only computes vectors for new or changed blocks.
-15. Unchanged `block_hash` values do not trigger repeated embedding.
-16. Embedding discovery creates candidate semantic edges with score, provider, model, and status.
-17. Candidate semantic edges never count as confirmed edges without explicit confirmation, handoff evidence, test verification, or validated extractor judgment.
-18. Enabling extractor only processes high-value blocks.
-19. Provider failures downgrade to base query instead of breaking `query`.
-20. Status clearly separates Context index, Embedding index, Extractor index, Candidate edge count, Confirmed edge count, and Pending semantic edge blocks.
-21. Query results include source, line range, domain, priority, confidence, status, and freshness.
-22. Every new feature has focused tests.
+4. `explain-query` shows normalized query, inferred intent, extracted entities, expanded queries, and retriever plan.
+5. MCP `get_relevant_context` uses Query Planner Lite and does not rely on a single raw FTS query.
+6. If original query misses but expanded query hits, results are returned and marked with the matched expanded query.
+7. If all retrieval channels miss, response includes query plan and suggestions.
+8. Project detection selects useful defaults for common stacks without manual source editing.
+9. JS/Vue/Node projects index meaningful app entrypoints under the `project` preset without scanning dependencies or build output.
+10. Default indexing does not unexpectedly scan an entire source tree.
+11. Broad source indexing is an explicit preset with scale warnings and strong excludes.
+12. ContextGraph documentation and command output clearly state that it complements, rather than replaces, CodeGraph, Sourcegraph, LSP, and IDE indexes.
+13. File/module scoped queries return related rules, failures, fixes, test requirements, and handoffs without claiming code call-graph knowledge.
+14. Knowledge Domain inference can route a blockchain, deployment, testing, frontend, or backend task toward relevant experience without hiding global P0 rules.
+15. `contextgraph brief "<task>"` returns P0 Rules, Current Source of Truth, Environment Facts, Required Flow, Required Tests, Deprecated Docs, Known Failure Modes, and Related Files.
+16. Environment facts include address, purpose, source, `last_verified_at`, status, confidence, and domain.
+17. Superseded docs are marked `deprecated` and linked to current source of truth.
+18. Enabling embedding only computes vectors for new or changed blocks.
+19. Unchanged `block_hash` values do not trigger repeated embedding.
+20. Embedding discovery creates candidate semantic edges with score, provider, model, and status.
+21. Candidate semantic edges never count as confirmed edges without explicit confirmation, handoff evidence, test verification, or validated extractor judgment.
+22. Enabling extractor only processes high-value blocks.
+23. Provider failures downgrade to base query instead of breaking `query`.
+24. Status clearly separates Context index, Embedding index, Extractor index, Candidate edge count, Confirmed edge count, and Pending semantic edge blocks.
+25. Query results include source, line range, domain, priority, confidence, status, and freshness.
+26. Every new feature has focused tests.

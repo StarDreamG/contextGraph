@@ -1,14 +1,17 @@
 import path from "node:path";
 import { getContextStatus } from "./statusService.js";
 import { assessPriority, priorityRank } from "../indexing/priority.js";
+import { buildQueryPlan, type QueryPlan } from "../query/queryPlanner.js";
 import { openDatabase } from "../storage/database.js";
 import type { Priority, QueryResult, StatusSnapshot } from "../types/domain.js";
 
 export interface ContextQueryResponse {
   query: string;
+  queryPlan: QueryPlan;
   status: StatusSnapshot;
   results: QueryResult[];
   warnings: string[];
+  suggestions: string[];
 }
 
 interface QueryRow {
@@ -23,6 +26,8 @@ interface QueryRow {
   status: string;
   metadata: string | null;
   rank: number;
+  matchedQuery: string;
+  matchedByExpandedQuery: boolean;
 }
 
 export async function queryContext(projectRoot: string, query: string): Promise<ContextQueryResponse> {
@@ -32,30 +37,80 @@ export async function queryContext(projectRoot: string, query: string): Promise<
   }
 
   const status = await getContextStatus(projectRoot);
+  const queryPlan = buildQueryPlan(trimmed);
   const db = openDatabase(path.join(projectRoot, ".contextgraph", "graph.db"));
-  const ftsQuery = toFtsQuery(trimmed);
-  const rows = runQuery(db, ftsQuery, queryTerms(trimmed));
+  const directRows = runQueryForText(db, queryPlan.normalizedQuery, queryPlan.normalizedQuery, false);
+  const rows = collectRows(db, queryPlan, directRows);
   db.close();
 
   const results = rows
     .map(toQueryResult)
-    .sort((left, right) => priorityRank(left.priority) - priorityRank(right.priority) || left.rank - right.rank)
+    .sort((left, right) => resultScore(right, queryPlan) - resultScore(left, queryPlan))
     .slice(0, 10);
+
+  const warnings = status.status === "Stale" ? ["ContextGraph is stale. Results may be outdated."] : [];
+  if (directRows.length === 0 && results.length > 0) {
+    warnings.push("Original query had no direct matches. Returned results from expanded queries.");
+  }
+  if (results.length === 0) {
+    warnings.push("No relevant context found.");
+  }
 
   return {
     query: trimmed,
+    queryPlan,
     status,
     results,
-    warnings: status.status === "Stale" ? ["ContextGraph is stale. Results may be outdated."] : []
+    warnings,
+    suggestions:
+      results.length === 0
+        ? [
+            "try a shorter entity query",
+            "try a known port/config/file name",
+            `run contextgraph explain-query "${trimmed.replaceAll('"', '\\"')}"`
+          ]
+        : []
   };
 }
 
-function runQuery(db: ReturnType<typeof openDatabase>, ftsQuery: string, terms: string[]): QueryRow[] {
+function collectRows(
+  db: ReturnType<typeof openDatabase>,
+  queryPlan: QueryPlan,
+  directRows: QueryRow[]
+): QueryRow[] {
   const rows = new Map<string, QueryRow>();
-  for (const row of runFtsQuery(db, ftsQuery)) {
+  for (const row of directRows) {
+    rows.set(rowKey(row), row);
+  }
+
+  for (const expandedQuery of queryPlan.expandedQueries) {
+    const matchedByExpandedQuery = expandedQuery !== queryPlan.normalizedQuery;
+    for (const row of runQueryForText(db, expandedQuery, expandedQuery, matchedByExpandedQuery)) {
+      const key = rowKey(row);
+      const existing = rows.get(key);
+      if (!existing || rowPreference(row, queryPlan) > rowPreference(existing, queryPlan)) {
+        rows.set(key, row);
+      }
+    }
+  }
+
+  return [...rows.values()];
+}
+
+function runQueryForText(
+  db: ReturnType<typeof openDatabase>,
+  query: string,
+  matchedQuery: string,
+  matchedByExpandedQuery: boolean
+): QueryRow[] {
+  const rows = new Map<string, QueryRow>();
+  const terms = queryTerms(query);
+  const ftsQuery = toFtsQuery(query);
+
+  for (const row of runFtsQuery(db, ftsQuery, matchedQuery, matchedByExpandedQuery)) {
     rows.set(row.id, row);
   }
-  for (const row of runLikeQuery(db, terms)) {
+  for (const row of runLikeQuery(db, terms, matchedQuery, matchedByExpandedQuery)) {
     if (!rows.has(row.id)) {
       rows.set(row.id, row);
     }
@@ -63,7 +118,16 @@ function runQuery(db: ReturnType<typeof openDatabase>, ftsQuery: string, terms: 
   return [...rows.values()];
 }
 
-function runFtsQuery(db: ReturnType<typeof openDatabase>, ftsQuery: string): QueryRow[] {
+function runFtsQuery(
+  db: ReturnType<typeof openDatabase>,
+  ftsQuery: string,
+  matchedQuery: string,
+  matchedByExpandedQuery: boolean
+): QueryRow[] {
+  if (ftsQuery.length === 0) {
+    return [];
+  }
+
   const sql = `
 SELECT
   nodes.id AS id,
@@ -76,7 +140,9 @@ SELECT
   nodes.confidence AS confidence,
   nodes.status AS status,
   nodes.metadata AS metadata,
-  bm25(nodes_fts) AS rank
+  bm25(nodes_fts) AS rank,
+  ? AS matchedQuery,
+  ? AS matchedByExpandedQuery
 FROM nodes_fts
 JOIN nodes ON nodes.id = nodes_fts.node_id
 LEFT JOIN blocks ON blocks.id = nodes.block_id
@@ -85,13 +151,18 @@ ORDER BY rank
 LIMIT 50`;
 
   try {
-    return db.prepare(sql).all(ftsQuery) as QueryRow[];
+    return db.prepare(sql).all(matchedQuery, Number(matchedByExpandedQuery), ftsQuery) as QueryRow[];
   } catch {
-    return db.prepare(sql).all(quoteTerms(ftsQuery)) as QueryRow[];
+    return db.prepare(sql).all(matchedQuery, Number(matchedByExpandedQuery), quoteTerms(ftsQuery)) as QueryRow[];
   }
 }
 
-function runLikeQuery(db: ReturnType<typeof openDatabase>, terms: string[]): QueryRow[] {
+function runLikeQuery(
+  db: ReturnType<typeof openDatabase>,
+  terms: string[],
+  matchedQuery: string,
+  matchedByExpandedQuery: boolean
+): QueryRow[] {
   if (terms.length === 0) {
     return [];
   }
@@ -110,13 +181,15 @@ SELECT
   nodes.confidence AS confidence,
   nodes.status AS status,
   nodes.metadata AS metadata,
-  0 AS rank
+  0 AS rank,
+  ? AS matchedQuery,
+  ? AS matchedByExpandedQuery
 FROM nodes
 LEFT JOIN blocks ON blocks.id = nodes.block_id
 WHERE ${clauses}
 LIMIT 50`;
 
-  return db.prepare(sql).all(...params) as QueryRow[];
+  return db.prepare(sql).all(matchedQuery, Number(matchedByExpandedQuery), ...params) as QueryRow[];
 }
 
 function toFtsQuery(query: string): string {
@@ -126,7 +199,10 @@ function toFtsQuery(query: string): string {
 }
 
 function queryTerms(query: string): string[] {
-  return query.split(/\s+/).filter(Boolean);
+  return query
+    .split(/\s+/)
+    .map((term) => term.trim())
+    .filter(Boolean);
 }
 
 function toFtsTerm(term: string): string {
@@ -156,8 +232,57 @@ function toQueryResult(row: QueryRow): QueryResult {
     endLine: row.endLine,
     confidence: row.confidence,
     status: row.status,
-    rank: row.rank
+    rank: row.rank,
+    matchedQuery: row.matchedQuery,
+    matchedByExpandedQuery: Boolean(row.matchedByExpandedQuery)
   };
+}
+
+function resultScore(result: QueryResult, queryPlan: QueryPlan): number {
+  let score = 0;
+  if (!result.matchedByExpandedQuery) {
+    score += 40;
+  }
+  score += entityMatchCount(`${result.title}\n${result.content}`, queryPlan) * 100;
+  score += Math.max(0, 50 - priorityRank(result.priority) * 10);
+  if (result.type === "Rule") {
+    score += 25;
+  }
+  if (["EnvironmentFact", "TestRequirement", "Risk", "PortConstraint"].includes(result.type)) {
+    score += 20;
+  }
+  if (result.sourcePath && /(^|\/)(AGENTS|CLAUDE)\.md$/i.test(result.sourcePath)) {
+    score += 15;
+  } else if (result.sourcePath?.startsWith("docs/")) {
+    score += 10;
+  }
+  if (result.status === "deprecated" || result.status === "stale") {
+    score -= 30;
+  }
+  score -= Math.max(0, result.rank);
+  return score;
+}
+
+function rowPreference(row: QueryRow, queryPlan: QueryPlan): number {
+  return resultScore(toQueryResult(row), queryPlan);
+}
+
+function entityMatchCount(text: string, queryPlan: QueryPlan): number {
+  const entities = [
+    ...queryPlan.entities.numbers,
+    ...queryPlan.entities.ports,
+    ...queryPlan.entities.ips,
+    ...queryPlan.entities.files,
+    ...queryPlan.entities.configKeys
+  ];
+  return new Set(entities.filter((entity) => text.includes(entity))).size;
+}
+
+function rowKey(row: QueryRow): string {
+  if (row.sourcePath) {
+    return `${row.sourcePath}:${row.startLine ?? "?"}:${row.endLine ?? "?"}`;
+  }
+  return row.id;
 }
 
 function parseMetadata(raw: string | null): Record<string, unknown> {

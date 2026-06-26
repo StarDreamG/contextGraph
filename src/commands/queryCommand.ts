@@ -19,6 +19,21 @@ export function registerQueryCommand(program: Command): void {
       console.log("Relevant Context:");
       if (response.results.length === 0) {
         console.log("No relevant context found.");
+        console.log("");
+        console.log("Query plan:");
+        console.log(`- normalized query: ${response.queryPlan.normalizedQuery}`);
+        console.log(`- inferred intent: ${formatList(response.queryPlan.intents)}`);
+        console.log(`- expected types: ${formatList(response.queryPlan.expectedTypes)}`);
+        console.log(`- extracted terms: ${formatList(response.queryPlan.entities.terms)}`);
+        console.log("- expanded queries attempted:");
+        for (const expandedQuery of response.queryPlan.expandedQueries) {
+          console.log(`  - ${expandedQuery}`);
+        }
+        console.log("");
+        console.log("Suggestions:");
+        for (const suggestion of response.suggestions) {
+          console.log(`- ${suggestion}`);
+        }
         return;
       }
       for (const result of response.results) {
@@ -28,6 +43,11 @@ export function registerQueryCommand(program: Command): void {
         console.log(`[${result.type}] ${result.title}`);
         console.log(`Priority: ${result.priority} (${result.priorityReason})`);
         console.log(`Source: ${source}`);
+        if (result.matchedByExpandedQuery && result.matchedQuery) {
+          console.log(`Matched by expanded query: ${result.matchedQuery}`);
+        } else if (result.matchedQuery) {
+          console.log(`Matched query: ${result.matchedQuery}`);
+        }
         console.log(`Confidence: ${result.confidence}`);
         console.log(`Status: ${result.status}`);
         console.log("Content:");
@@ -35,4 +55,8 @@ export function registerQueryCommand(program: Command): void {
         console.log("");
       }
     });
+}
+
+function formatList(values: string[]): string {
+  return values.length === 0 ? "none" : values.join(", ");
 }
