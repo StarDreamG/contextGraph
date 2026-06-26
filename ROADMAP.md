@@ -19,6 +19,15 @@ ContextGraph 的方向是从关键词索引升级为语义上下文索引。升�
 
 Level 0 后续还要继续加固中文 trigram 片段检索、query 结果字段和 status 可靠性展示，但不能引入模型硬依赖。
 
+## Product Boundary: Project Experience Facts
+
+ContextGraph 不是低配 CodeGraph，也不应该进入完整源码解析、符号表和调用链赛道。
+
+- CodeGraph / Sourcegraph / LSP / IDE indexes 负责代码事实：类、函数、符号引用、调用链、接口实现和模块依赖。
+- ContextGraph 负责项目经验事实：agent 指令、项目规约、历史踩坑、修复经验、测试要求、部署注意事项、handoff、团队约定和工具环境。
+
+下一阶段允许 ContextGraph 关联源码路径、模块名和测试命令，但这只是把经验节点落到具体文件或模块上，不是解析源码语义。目标是回答“这个文件/模块相关的项目经验、规则、风险和测试是什么”，而不是回答“这个函数被谁调用”。
+
 ## Next Priority: MCP Lifecycle And Index Presets
 
 一次真实项目试用暴露出几个比 embedding 更靠前的开箱即用问题。它们属于 Level 0 hardening，必须在语义索引扩展前优先处理：
@@ -35,6 +44,9 @@ Level 0 后续还要继续加固中文 trigram 片段检索、query 结果字段
 - `project` 面向新 Agent 开箱即用，补充常见项目入口、路由、服务端代理、部署配置和脚本。
 - `source` 才允许扩展到源码全量或大范围索引，并必须有规模提示、强排除规则和可回退配置。
 - source 索引必须避免扫入低价值或高噪声内容，例如 `node_modules`、构建产物、锁文件、生成文件、大型静态资源、二进制文件和历史数据库。
+- 新增经验到源码的轻量关联能力：从文档、handoff 和 session summary 中抽取文件路径、目录、模块名和测试命令，建立 `RELATED_TO_FILE`、`APPLIES_TO` 和 `REQUIRES_TEST` 等关系。
+- 增加 `query --file <path>` 和 `query --module <name>`，查询某个源码文件或模块关联的项目规约、失败、修复、风险、测试和 handoff。
+- status 应强调 context freshness，而不是假装提供 code index freshness。
 
 这些修复的验收目标是：用户完成 `contextgraph init && contextgraph index` 后，无论通过 CLI 还是 MCP 查询，都能得到一致、可解释、可恢复的状态。
 
@@ -160,6 +172,8 @@ Overall reliability:  Medium
 - JS/Vue/Node 项目在不手动编辑 sources 的情况下也能索引到有效项目入口和源码上下文。
 - 默认 indexing preset 不会意外扫入整个源码树；大范围 source 索引必须显式启用。
 - source preset 必须有规模提示、排除规则和测试覆盖。
+- README 和命令输出必须明确：ContextGraph 是项目经验事实层，不替代 CodeGraph / Sourcegraph / LSP 的代码事实层。
+- `query --file` / `query --module` 能返回关联的规则、失败、修复、测试要求和 handoff，并标明这些是经验关联，不是代码调用链。
 - 启用 embedding 后，只对新增或变更 block 生成向量。
 - `block_hash` 不变时，不重复计算 embedding。
 - 启用 extractor 后，只处理高价值 block。

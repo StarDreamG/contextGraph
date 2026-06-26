@@ -4,6 +4,10 @@
 
 ContextGraph will evolve from a keyword-first local index into a semantic context index for coding agents. The implementation must stay layered: Level 0 remains fast and dependency-light, while embedding and extractor capabilities are optional add-ons that read and write local SQLite state.
 
+ContextGraph must remain a project experience index, not a source-code knowledge graph. CodeGraph, Sourcegraph, LSP, IDE indexes, and tree-sitter based tools own code facts such as symbols, references, call chains, implementations, and AST-level structure. ContextGraph owns agent-facing project experience: rules, workflows, handoffs, failures, fixes, decisions, test requirements, environment notes, deployment constraints, and tool usage history.
+
+The product opportunity is to stop coding agents from treating a local README or a single grep hit as the whole project. ContextGraph should show the broader operational memory around a task, with priority, provenance, freshness, and reliability.
+
 ## Architecture Levels
 
 ### Level 0: Base Mode
@@ -47,6 +51,8 @@ Required design response:
 - `basic` should remain small and safe.
 - `project` should improve new-agent onboarding with common source entrypoints, framework files, deployment/runtime files, and test/API fixtures.
 - `source` should be explicit, bounded, and guarded by ignore rules plus scale warnings.
+- Add source association without source-code parsing: extract file paths, directories, module names, and test commands from docs, handoff, and session summaries, then connect them to experience nodes.
+- Add file/module scoped queries so agents can ask which project rules, failures, fixes, tests, and handoffs apply to a file or module.
 
 This work is still Level 0: it must not introduce model providers, network calls, vector databases, or query-time LLM use.
 
@@ -369,6 +375,56 @@ Raw `sources` and `ignore` arrays may remain as advanced overrides, but presets 
 
 If detection confidence is low, ContextGraph should choose `basic`, show a warning, and suggest candidate presets instead of guessing a broad source scan.
 
+## Source Association Plan
+
+ContextGraph should associate project experience with source files and modules, but it should not parse source code into a code intelligence graph.
+
+Non-goals for this layer:
+
+- no AST parsing requirement
+- no symbol table
+- no call graph
+- no interface implementation graph
+- no Spring/DI/container analysis
+- no replacement for CodeGraph, Sourcegraph, LSP, or IDE indexes
+
+Inputs:
+
+- explicit file paths in docs, AGENTS/CLAUDE, Cursor rules, handoff, and imported session summaries
+- directory names and module names mentioned in high-value blocks
+- test commands and test file paths
+- stack/framework marker files selected by the project detector
+
+Relationships:
+
+- `RELATED_TO_FILE`: a rule, failure, fix, decision, risk, command, or handoff mentions a concrete file or path.
+- `APPLIES_TO`: a rule, decision, risk, or test requirement applies to a module, directory, package, or file.
+- `REQUIRES_TEST`: a rule, fix, or module association points to a required test command or test file.
+- `MENTIONS_MODULE`: a context item references a named module without enough confidence for `APPLIES_TO`.
+
+Planned query commands:
+
+```bash
+contextgraph query --file src/example.ts
+contextgraph query --module export
+```
+
+Expected result shape should keep the boundary clear:
+
+- source path and line range for the context item
+- relationship type such as `APPLIES_TO` or `REQUIRES_TEST`
+- confidence and status
+- priority and priority reason
+- a note that this is project-experience context, not a code call graph
+
+The first implementation can use deterministic extraction:
+
+- path-like tokens: `src/...`, `server/...`, `docs/...`, `tests/...`, `*.java`, `*.ts`, `*.vue`, `*.py`, `*.go`, `*.rs`, `*.cpp`, `*.h`
+- command-like test tokens: `npm test`, `pnpm test`, `vitest`, `playwright`, `mvn test`, `pytest`, `go test`, `cargo test`
+- module signals from headings, bullet labels, and configured detector metadata
+
+Extractor/LLM support may improve recall later, but query-time LLM use remains forbidden.
+
 ## Status Reliability Panel
 
 `contextgraph status` should report independent freshness:
@@ -440,31 +496,39 @@ Do not build these in the next phase:
    - add scale warnings and stronger excludes
    - add tests for project detection, preset expansion, and large-project guardrails
 
-4. Embedding interface and state
+4. Source association and scoped query
+   - extract file paths, module names, and test commands from high-value context
+   - add `RELATED_TO_FILE`, `APPLIES_TO`, `REQUIRES_TEST`, and `MENTIONS_MODULE` relations
+   - add `contextgraph query --file <path>`
+   - add `contextgraph query --module <name>`
+   - keep relationship output explicit that it is project-experience context, not code intelligence
+   - add tests for path extraction, test command extraction, file query, and module query
+
+5. Embedding interface and state
    - add config shape
    - add `embeddings` table
    - add `contextgraph embedding status`
    - add stale and pending calculations
    - add tests proving disabled mode preserves existing behavior
 
-5. Embedding execution
+6. Embedding execution
    - add first provider implementation behind explicit enablement
    - add incremental embedding by `block_hash`
    - add rebuild command
    - add hybrid score merge
 
-6. Extractor interface and high-value selector
+7. Extractor interface and high-value selector
    - add deterministic selector
    - add extractor config and status
    - add schema validation
    - add tests for selector and provider failure fallback
 
-7. Extractor execution
+8. Extractor execution
    - add first provider implementation behind explicit enablement
    - store candidate extracted items
    - expose candidate items in brief/query without treating them as confirmed
 
-8. Governance
+9. Governance
    - conflict detection
    - stale rule detection
    - required tests recommendation
@@ -481,10 +545,12 @@ Future implementation work must satisfy:
 5. JS/Vue/Node projects index meaningful app entrypoints under the `project` preset without scanning dependencies or build output.
 6. Default indexing does not unexpectedly scan an entire source tree.
 7. Broad source indexing is an explicit preset with scale warnings and strong excludes.
-8. Enabling embedding only computes vectors for new or changed blocks.
-9. Unchanged `block_hash` values do not trigger repeated embedding.
-10. Enabling extractor only processes high-value blocks.
-11. Provider failures downgrade to base query instead of breaking `query`.
-12. Status clearly separates Context index, Embedding index, and Extractor index freshness.
-13. Query results include source, line range, confidence, and status.
-14. Every new feature has focused tests.
+8. ContextGraph documentation and command output clearly state that it complements, rather than replaces, CodeGraph, Sourcegraph, LSP, and IDE indexes.
+9. File/module scoped queries return related rules, failures, fixes, test requirements, and handoffs without claiming code call-graph knowledge.
+10. Enabling embedding only computes vectors for new or changed blocks.
+11. Unchanged `block_hash` values do not trigger repeated embedding.
+12. Enabling extractor only processes high-value blocks.
+13. Provider failures downgrade to base query instead of breaking `query`.
+14. Status clearly separates Context index, Embedding index, and Extractor index freshness.
+15. Query results include source, line range, confidence, and status.
+16. Every new feature has focused tests.

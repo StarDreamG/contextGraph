@@ -1,23 +1,46 @@
 # ContextGraph
 
-ContextGraph is a local-first context graph for coding agents.
-Markdown files are sources.
-Agent sessions are sources.
-Git history is a source.
-Test commands are sources.
-The graph is the interface.
-The status is the trust layer.
-MCP is the agent protocol.
+ContextGraph exists because coding agents often explore project documents through narrow grep/read loops.
+
+They may read one README section, one AGENTS.md fragment, or one previous note, then make decisions without seeing the whole project experience.
+
+ContextGraph indexes agent-facing project knowledge into small, traceable, queryable context units, so a new agent can retrieve the relevant rules, decisions, tests, failures, fixes, and handoffs before acting.
+
+Use CodeGraph for code facts.
+Use ContextGraph for project experience facts.
+Together, they give coding agents both structural understanding and operational memory.
+
+ContextGraph is not a source-code graph. It does not replace Sourcegraph, CodeGraph, LSP, or IDE indexes. It complements them by indexing project experience facts:
+
+- agent instructions
+- project rules
+- development workflows
+- testing requirements
+- handoff notes
+- historical failures
+- fixes
+- decisions
+- environment and deployment notes
+- model/agent usage conventions
+
+Query results must show source, type, confidence/status, and freshness. Status and freshness are part of the trust layer, not optional display.
 
 ## 它是什么
 
-ContextGraph 是面向 AI Coding Agent 的本地上下文图谱工具。它把项目规约、流程、命令、测试、决策、失败记录、修复方案、环境说明、偏好和 Agent handoff 摘要索引到本地 SQLite 图谱中。
+ContextGraph 是面向 AI Coding Agent 的本地项目经验索引。它参考 CodeGraph 的“预索引、可查询、可溯源”思想，但索引对象不是源码，而是 README、AGENTS.md、CLAUDE.md、docs、handoff、session summary 和团队经验记录中面向 Agent 的项目知识。
 
-它的目标不是替代 CodeGraph。CodeGraph 更适合预索引代码结构；ContextGraph 预索引的是项目经验和执行上下文。
+它的根目的是避免 Agent 只用 `grep` / `rg` / `read` 抓到 README 或局部文档后，就把局部事实误判成项目全貌。ContextGraph 预索引的是 agent-facing project experience，让新 Agent 在动手前先看到规约、历史经验、测试要求、部署注意事项和工具环境，而不是从零试探。
+
+ContextGraph 不和 CodeGraph 抢同一层：
+
+- CodeGraph / Sourcegraph / LSP / IDE indexes 适合处理代码事实：类、函数、符号引用、调用链、接口实现和模块依赖。
+- ContextGraph 处理项目经验事实：agent 指令、团队规约、历史踩坑、修复经验、测试要求、部署约束、handoff、决策、环境说明和模型/agent 使用约定。
 
 ## 它不是什么
 
-ContextGraph 不是 Markdown 文档管理器、云知识库、向量数据库、远程 LLM 包装器，也不是 UI 优先的文档产品。
+ContextGraph 不是 source-code knowledge graph，不替代 CodeGraph、Sourcegraph、LSP、IDE 索引或 tree-sitter 级源码解析。它不负责回答“这个方法有哪些调用方”“这个 Spring Bean 怎么注入”“这个 interface 有哪些实现”这类代码结构问题。
+
+ContextGraph 也不是 Markdown 文档管理器、云知识库、向量数据库、远程 LLM 包装器或 UI 优先的文档产品。
 
 第一版不会上传任何数据，不会调用远程 LLM，不会打开网络端口。
 
@@ -96,6 +119,14 @@ npm run contextgraph -- status
 
 查询结果会优先返回高优先级节点，并显示 `Priority` 和原因。
 
+后续会补强“经验关联源码”的能力，但仍不把 ContextGraph 做成源码解析器。目标是从文档、handoff 和 session summary 中抽取文件路径、模块名和测试命令，建立：
+
+- `RELATED_TO_FILE`：经验节点关联到源码文件或配置文件。
+- `APPLIES_TO`：规则或风险适用于某个模块、目录或文件。
+- `REQUIRES_TEST`：修改相关文件或模块后应运行的测试。
+
+这样 Agent 可以查询“这个文件/模块相关的项目经验是什么”，同时继续把调用链、符号和实现关系交给 CodeGraph / LSP。
+
 ## Brief
 
 `brief` 面向新 Agent 开工前阅读：
@@ -146,7 +177,7 @@ ContextGraph 默认 local-first：
 
 详细阶段计划见 [ROADMAP.md](./ROADMAP.md)，后续开发设计见 [docs/dev-plan.md](./docs/dev-plan.md)。
 
-下一阶段会优先补齐真实试用中暴露的基础体验：MCP 长进程状态刷新、`reload_contextgraph`、更清晰的 MCP 诊断、项目类型自动识别，以及 `basic` / `project` / `source` 索引 preset，避免默认索引过窄或源码索引失控。
+下一阶段会优先补齐真实试用中暴露的基础体验：MCP 长进程状态刷新、`reload_contextgraph`、更清晰的 MCP 诊断、项目类型自动识别、源码路径/模块/测试命令关联，以及 `basic` / `project` / `source` 索引 preset，避免默认索引过窄或源码索引失控。
 
 ## MCP
 
