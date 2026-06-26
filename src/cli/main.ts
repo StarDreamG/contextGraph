@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { readFileSync } from "node:fs";
 import { Command } from "commander";
 import { registerBriefCommand } from "../commands/briefCommand.js";
 import { registerDoctorCommand } from "../commands/doctorCommand.js";
@@ -11,7 +12,10 @@ import { registerStatusCommand } from "../commands/statusCommand.js";
 
 export function buildProgram(): Command {
   const program = new Command();
-  program.name("contextgraph").description("Local-first context graph for coding agents.");
+  program
+    .name("contextgraph")
+    .description("Local-first context graph for coding agents.")
+    .version(readPackageVersion());
   registerInitCommand(program);
   registerIndexCommand(program);
   registerStatusCommand(program);
@@ -21,6 +25,15 @@ export function buildProgram(): Command {
   registerHandoffCommand(program);
   registerMcpCommand(program);
   return program;
+}
+
+function readPackageVersion(): string {
+  const packageJsonUrl = new URL("../../package.json", import.meta.url);
+  const packageJson = JSON.parse(readFileSync(packageJsonUrl, "utf8")) as { version?: unknown };
+  if (typeof packageJson.version !== "string" || packageJson.version.length === 0) {
+    throw new Error("ContextGraph package version is missing.");
+  }
+  return packageJson.version;
 }
 
 export async function main(argv = process.argv): Promise<void> {

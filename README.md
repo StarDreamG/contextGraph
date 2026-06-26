@@ -184,6 +184,6 @@ MCP 使用 stdio。日志和诊断信息写入 stderr，stdout 保留给 MCP 协
 
 Phase 2 还必须建立项目工具环境画像。它要从历史 sessions 和本地配置中抽取这个项目常用或曾经失败的 MCP servers、skills、插件/连接器、浏览器/Playwright 自动化、文档/PDF/表格工具和测试工具，让新 Agent 能知道开工前该加载哪些能力。
 
-## 许可证
+## License
 
-本项目使用 MIT 许可证，详见 [LICENSE](LICENSE)。
+License: Apache-2.0. See [LICENSE](LICENSE).

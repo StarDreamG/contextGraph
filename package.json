@@ -1,8 +1,13 @@
 {
   "name": "@stardreamg/contextgraph",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Local-first context graph for coding agents.",
+  "license": "Apache-2.0",
   "type": "module",
+  "main": "dist/cli/main.js",
+  "exports": {
+    ".": "./dist/cli/main.js"
+  },
   "engines": {
     "node": ">=22 <25"
   },
@@ -10,8 +15,7 @@
     "bin",
     "dist",
     "README.md",
-    "ROADMAP.md",
-    "docs/dev-plan.md"
+    "LICENSE"
   ],
   "publishConfig": {
     "access": "public"
