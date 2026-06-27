@@ -3,4 +3,6 @@ dist/
 .contextgraph/
 .codegraph/
 *.log
+.qoder/
+.tmp-contextgraph-demo/
 

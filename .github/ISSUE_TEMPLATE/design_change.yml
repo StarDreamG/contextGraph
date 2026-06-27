@@ -1,0 +1,43 @@
+name: Design change
+description: Propose a product, architecture, or workflow change
+title: "[Design Change]: "
+labels: ["design-change", "needs-review"]
+body:
+  - type: textarea
+    id: current_design
+    attributes:
+      label: Current design
+      description: What is the current behavior or design?
+    validations:
+      required: true
+  - type: textarea
+    id: proposed_change
+    attributes:
+      label: Proposed change
+      description: What should change?
+    validations:
+      required: true
+  - type: textarea
+    id: reason
+    attributes:
+      label: Reason
+      description: Why is this change needed?
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: What docs, code, users, APIs, or workflows are affected?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance criteria
+      value: |
+        - [ ] Product docs updated if needed
+        - [ ] Implementation impact identified
+        - [ ] Follow-up Issues created if needed
+    validations:
+      required: true
