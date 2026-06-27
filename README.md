@@ -22,6 +22,8 @@ ContextGraph is not a source-code graph. It does not replace Sourcegraph, CodeGr
 - decisions
 - environment and deployment notes
 - model/agent usage conventions
+- high-value source comments when they express operational knowledge
+- Swagger / OpenAPI interface contracts
 
 Query results must show source, type, confidence/status, and freshness. Status and freshness are part of the trust layer, not optional display.
 
@@ -36,6 +38,8 @@ ContextGraph 不和 CodeGraph 抢同一层：
 - CodeGraph / Sourcegraph / LSP / IDE indexes 适合处理代码事实：类、函数、符号引用、调用链、接口实现和模块依赖。
 - ContextGraph 处理项目经验事实：agent 指令、团队规约、历史踩坑、修复经验、测试要求、部署约束、handoff、决策、环境说明和模型/agent 使用约定。
 
+Source comments 和 Swagger / OpenAPI 也遵守这条边界：只有当它们表达项目经验、运行约束、接口契约、风险、兼容性说明、测试或部署要求时，才属于 ContextGraph。普通代码实现、调用链、符号引用、interface 实现或 Spring Bean 注入分析仍然交给 CodeGraph / Sourcegraph / LSP。
+
 AGENTS.md 是 Agent 的入口说明，ContextGraph 是入口背后的经验索引和全局视图。Agent 可以先读 AGENTS.md 获得开工约束，再通过 ContextGraph 查询当前任务相关的经验事实、新鲜度和优先级。
 
 ## 它不是什么
@@ -45,6 +49,8 @@ ContextGraph 不是 source-code knowledge graph，不替代 CodeGraph、Sourcegr
 ContextGraph 也不是 Markdown 文档管理器、云知识库、向量数据库、远程 LLM 包装器或 UI 优先的文档产品。
 
 第一版不会上传任何数据，不会调用远程 LLM，不会打开网络端口。
+
+即使后续支持 Source Comments，也只提取高价值注释，不索引普通源码实现，不做 AST 语义分析，不建立调用链。即使后续支持 Swagger / OpenAPI，也只把它作为接口契约和项目经验事实，不把它扩展成完整后端代码图谱。
 
 ## 安装
 
@@ -174,6 +180,68 @@ Matched by expanded query: 智策星 端口
 
 后续会增加 `supersedes` 关系，用于标记新文档、新 handoff 或新规则替代旧文档。
 
+## Optional Sources: API Contracts And Source Comments
+
+ContextGraph 后续会增加两个可选索引来源，但它们不会改变产品边界：
+
+Use CodeGraph for code facts.
+Use ContextGraph for project experience facts.
+
+Source comments and OpenAPI belong to ContextGraph only when they express project experience, operational constraints, interface contracts, risks, compatibility notes, or testing/deployment requirements.
+
+### Swagger / OpenAPI
+
+`v0.2.x` 规划增加 `api` preset：
+
+```bash
+contextgraph index --preset api
+```
+
+默认扫描：
+
+- `openapi.json`
+- `openapi.yaml`
+- `swagger.json`
+- `swagger.yaml`
+- `docs/**/openapi*.json`
+- `docs/**/swagger*.yaml`
+
+OpenAPI / Swagger 是接口契约，适合纳入项目经验图谱。解析器将提取 endpoint、method、path、request params、request body、response schema、tags 和 deprecated 状态，并生成：
+
+- `ApiEndpoint`
+- `ApiSchema`
+- `ApiParameter`
+- `ApiResponse`
+- `ApiContract`
+
+API 契约节点在 `query` / `brief` 中可以被召回，优先级高于普通 README 描述，因为它们通常比散落说明更接近接口事实来源。
+
+### Source Comments
+
+`v0.2.x / v0.3.x` 规划增加 `source-comments` preset：
+
+```bash
+contextgraph index --preset source-comments
+```
+
+Source Comments 只提取源码附近的高价值注释，不索引普通代码实现，不默认全量开启，不做调用链分析。首批语言规划覆盖 Java、JS、TS、Vue、Python 和 Go。
+
+高价值注释关键词包括：必须、禁止、不能、不得、不要、注意、坑、兼容、历史、生产、部署、测试、回滚、风险、不能删除、不能修改、TODO、FIXME、HACK、deprecated、legacy、must、never、do not、warning、production。
+
+SourceComment 会生成经验节点，并进一步分类为：
+
+- `Rule`
+- `Risk`
+- `Failure`
+- `Fix`
+- `EnvironmentFact`
+- `Decision`
+- `CompatibilityNote`
+- `Todo`
+- `DeprecatedNote`
+
+SourceComment 默认 `status=candidate`，`confidence=medium`，必须保留 source file 和 line range。查询结果必须明确显示来源是 `source_comment`，避免 Agent 把过期注释误认为 confirmed rule。
+
 ## Example: Blockchain Maintenance
 
 A non-blockchain engineer maintaining blockchain integration across multiple clients uses ContextGraph to retrieve boundaries, endpoints, txid rules, deprecated docs, and failure modes before changing code.
@@ -198,10 +266,12 @@ contextgraph brief
 contextgraph brief --project /path/to/project
 ```
 
-后续会支持 task-aware brief：
+后续会把 `brief` 产品化为新 Agent 进入项目时的核心入口：
 
 ```bash
-contextgraph brief "维护多客户区块链集成"
+contextgraph brief --task "修改区块链附件上传"
+contextgraph brief --file src/blockchain/upload.ts
+contextgraph brief --domain blockchain
 ```
 
 输出分组包括：
@@ -217,6 +287,16 @@ contextgraph brief "维护多客户区块链集成"
 
 项目工具环境画像后续会从历史 session 导入中补齐，并进入 `Environment Facts`、`Required Flow` 和 `Required Tests` 等分组。
 
+`brief` 的目标不是替代 `query`，而是在 Agent 开工前先给出可信的全局视野：
+
+- P0 铁律
+- 当前 source of truth
+- 必须跑的测试
+- 部署/环境警告
+- 最近 handoff
+- 过期/冲突信息
+- 常见失败
+
 ## 安全策略
 
 ContextGraph 默认 local-first：
@@ -227,13 +307,18 @@ ContextGraph 默认 local-first：
 - 默认忽略 `.env`、私钥、证书、依赖目录、构建产物、Git 内部文件和 `.contextgraph/graph.db`。
 - 写入数据库前会脱敏疑似 API Key、Secret、Token、Password、Passphrase 和私钥区块。
 
-## 后续路线：语义上下文索引
+## 后续路线：先可信，再语义
 
-下一阶段目标是从关键词索引升级为语义上下文索引，但继续保持轻量、可选、可降级。
+下一阶段目标不是立刻变重，而是先把 Level 0 的可信闭环做扎实，再逐层增强到语义上下文索引。Embedding 和 LLM 能力后置，避免模型能力掩盖基础状态、MCP 生命周期和查询结果字段的问题。
 
-- `v0.1.x Query Planner Lite`：MCP 自然语言查询可靠性、query expansion、多路召回、zero-result fallback 和 `explain-query`。
-- `v0.2.x Embedding`：可选本地 embedding、hybrid search、semantic edge discovery 和 embedding status。
-- `v0.3.x Local LLM Extractor`：可选本地 LLM 结构化抽取 Rule / Failure / Fix / Decision / TestRequirement / Risk / EnvironmentFact，支持 conflict / stale / supersedes 推理和 candidate -> confirmed 工作流。
+工程优先级：
+
+1. `Level 0 Hardening`：MCP 长进程 reload / lazy refresh、MCP diagnostics、CLI/MCP 状态一致、watcher、status 拆 Context / Embedding / Extractor、query 结果字段稳定、中文 trigram / LIKE fallback 补强。
+2. `Brief Productization`：把 `contextgraph brief` 做成新 Agent 开工入口，支持 `--task`、`--file`、`--domain`，输出 P0 铁律、source of truth、必跑测试、环境警告、最近 handoff、过期/冲突信息和常见失败。
+3. `Experience-to-Source Association`：不解析 AST，只从文档/handoff/测试中抽文件路径、模块名和测试命令，建立 `RELATED_TO_FILE`、`APPLIES_TO`、`REQUIRES_TEST`，支持 `query --file` / `query --module`。
+4. `Project Detector + Presets`：增加 `basic`、`project`、`api`、`source-comments`、`source`，让默认范围安全但不贫血，大范围 source 必须显式确认。
+5. `Embedding`：可选本地 embedding、hybrid search、semantic edge discovery 和 embedding status。
+6. `Local LLM Extractor`：可选本地 LLM 结构化抽取 Rule / Failure / Fix / Decision / TestRequirement / Risk / EnvironmentFact，支持 candidate -> confirmed 工作流。
 
 - `Level 0 基础模式`：Markdown / JSON / Text parser、SQLite、FTS5、中文片段检索、status、query、MCP、handoff。未启用任何模型能力时，这一层必须独立可用。
 - `Level 1 Embedding 模式`：在 Level 0 上增加可选本地 embedding、semantic search、hybrid search 和 candidate semantic edge discovery。embedding 不作为默认硬依赖。
@@ -241,6 +326,15 @@ ContextGraph 默认 local-first：
 - `Level 3 Governance 模式`：规则冲突检测、过期规则检测、修改前风险提示、required tests 推荐和 stale context warning。
 
 FTS finds text. Embedding connects experience blocks. Graph expansion gives agents the full project context. Status tells whether the context is trustworthy.
+
+在 embedding 阶段，ContextGraph 还会用向量关联这些经验块：
+
+- 文档规则 ↔ 源码注释
+- OpenAPI endpoint ↔ 测试脚本
+- OpenAPI endpoint ↔ handoff 经验
+- OpenAPI endpoint ↔ 环境配置
+
+这些关系默认都是 candidate semantic edges，例如 `SEMANTICALLY_RELATED`、`MAY_APPLY_TO`、`POSSIBLY_REINFORCES` 和 `POSSIBLY_CONFLICTS`，不能直接当作 confirmed 规则或 confirmed 调用关系。
 
 ContextGraph does not make agents better at grep. It removes the need for agents to guess the right grep query. Agents may ask in natural language; ContextGraph must turn that natural language into a reliable query plan, retrieve from multiple channels, expand through the experience graph, and return traceable, freshness-aware context.
 
@@ -256,7 +350,7 @@ ContextGraph does not make agents better at grep. It removes the need for agents
 
 详细阶段计划见 [ROADMAP.md](./ROADMAP.md)，后续开发设计见 [docs/dev-plan.md](./docs/dev-plan.md)。
 
-下一阶段会优先补齐真实试用中暴露的基础体验：MCP 长进程状态刷新、`reload_contextgraph`、更清晰的 MCP 诊断、项目类型自动识别、源码路径/模块/测试命令关联，以及 `basic` / `project` / `source` 索引 preset，避免默认索引过窄或源码索引失控。
+当前 `0.1.x` 已开始补齐 Level 0 hardening：`status` 输出 Context / Embedding / Extractor 分层，MCP tool 每次调用都会重新检查本地 `.contextgraph` 状态，并提供 `diagnose_contextgraph` 和 `reload_contextgraph`。下一步继续补 watcher、brief 产品化、源码路径/模块/测试命令关联，以及谨慎的 preset 体系，避免默认索引过窄或源码索引失控。
 
 ## MCP
 
@@ -281,12 +375,14 @@ stdio MCP 配置可以使用同一个全局命令：
 }
 ```
 
-MVP 暴露两个工具：
+MCP 暴露这些工具：
 
 - `get_context_status`
+- `diagnose_contextgraph`
+- `reload_contextgraph`
 - `get_relevant_context`
 
-MCP 使用 stdio。日志和诊断信息写入 stderr，stdout 保留给 MCP 协议消息。
+MCP 使用 stdio。每次 tool 调用都会 lazy refresh 本地配置和数据库状态，避免长进程把启动时的未初始化状态缓存成永久状态。`diagnose_contextgraph` 会返回 `projectRoot`、`configPath`、`dbPath`、初始化状态、索引状态、`lastIndexedAt` 和下一步建议。
 
 ## MVP 限制
 

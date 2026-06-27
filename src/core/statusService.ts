@@ -8,6 +8,7 @@ import { redactSecrets } from "../security/redaction.js";
 import { openDatabase } from "../storage/database.js";
 import { GraphRepository } from "../storage/repositories.js";
 import type { StatusSnapshot } from "../types/domain.js";
+import { buildStatusSnapshot } from "./statusSnapshot.js";
 
 interface IndexedSource {
   id: string;
@@ -64,7 +65,7 @@ export async function getContextStatus(projectRoot: string): Promise<StatusSnaps
   const isStale = changedFiles > 0 || headChanged;
   const reliability = isStale ? "Low" : failedBlocks > 0 ? "Medium" : "High";
 
-  return {
+  return buildStatusSnapshot({
     status: isStale ? "Stale" : "Fresh",
     reliability,
     lastIndexedAt,
@@ -79,11 +80,11 @@ export async function getContextStatus(projectRoot: string): Promise<StatusSnaps
     failedBlocks,
     conflicts: 0,
     warnings: isStale ? ["ContextGraph is not up to date. Run: contextgraph index"] : []
-  };
+  });
 }
 
 function staleLow(input: { currentHead: string | null; warnings: string[] }): StatusSnapshot {
-  return {
+  return buildStatusSnapshot({
     status: "Stale",
     reliability: "Low",
     lastIndexedAt: null,
@@ -98,7 +99,7 @@ function staleLow(input: { currentHead: string | null; warnings: string[] }): St
     failedBlocks: 0,
     conflicts: 0,
     warnings: input.warnings
-  };
+  });
 }
 
 function readIndexedSources(db: ReturnType<typeof openDatabase>): IndexedSource[] {

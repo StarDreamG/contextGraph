@@ -15,6 +15,8 @@ export type NodeType =
 export type GraphStatus = "Fresh" | "Stale";
 export type Reliability = "High" | "Medium" | "Low";
 export type Priority = "P0" | "P1" | "P2" | "P3" | "P4";
+export type DerivedIndexStatus = "disabled" | "enabled" | "stale" | "failed";
+export type WatcherStatus = "stopped" | "watching" | "failed";
 
 export interface PrivacyConfig {
   offline: true;
@@ -94,8 +96,7 @@ export interface QueryResult {
   matchedByExpandedQuery?: boolean;
 }
 
-export interface StatusSnapshot {
-  indexVersion?: number;
+export interface ContextIndexSnapshot {
   status: GraphStatus;
   reliability: Reliability;
   lastIndexedAt: string | null;
@@ -109,5 +110,43 @@ export interface StatusSnapshot {
   pendingBlocks: number;
   failedBlocks: number;
   conflicts: number;
+}
+
+export interface DerivedIndexSnapshot {
+  status: DerivedIndexStatus;
+  provider: string;
+  model: string | null;
+  pending: number;
+  failed: number;
+  stale: number;
+}
+
+export interface WatcherSnapshot {
+  status: WatcherStatus;
+  mode: "disabled" | "local";
+  message: string;
+}
+
+export interface StatusSnapshot {
+  indexVersion?: number;
+  status: GraphStatus;
+  reliability: Reliability;
+  overallReliability: Reliability;
+  lastIndexedAt: string | null;
+  currentGitHead: string | null;
+  indexedGitHead: string | null;
+  sourceCount: number;
+  blockCount: number;
+  nodeCount: number;
+  edgeCount: number;
+  changedFiles: number;
+  pendingBlocks: number;
+  failedBlocks: number;
+  conflicts: number;
   warnings: string[];
+  contextIndex: ContextIndexSnapshot;
+  embeddingIndex: DerivedIndexSnapshot;
+  extractorIndex: DerivedIndexSnapshot;
+  searchMode: "FTS + trigram" | "hybrid";
+  watcher: WatcherSnapshot;
 }

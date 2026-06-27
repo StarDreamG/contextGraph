@@ -16,6 +16,7 @@ import { openDatabase } from "../storage/database.js";
 import { GraphRepository } from "../storage/repositories.js";
 import { migrate } from "../storage/schema.js";
 import type { BlockRecord, NodeRecord, SourceRecord, StatusSnapshot } from "../types/domain.js";
+import { buildStatusSnapshot } from "./statusSnapshot.js";
 
 const CURRENT_INDEX_VERSION = 2;
 
@@ -107,7 +108,7 @@ export async function indexContextGraph(projectRoot: string): Promise<IndexResul
   });
 
   const counts = repository.counts();
-  const snapshot: StatusSnapshot = {
+  const snapshot: StatusSnapshot = buildStatusSnapshot({
     indexVersion: CURRENT_INDEX_VERSION,
     status: "Fresh",
     reliability: "High",
@@ -123,7 +124,7 @@ export async function indexContextGraph(projectRoot: string): Promise<IndexResul
     failedBlocks: 0,
     conflicts: 0,
     warnings: []
-  };
+  });
   repository.setStatus(snapshot);
   db.close();
   await writeFile(path.join(projectRoot, ".contextgraph", "status.json"), `${JSON.stringify(snapshot, null, 2)}\n`);

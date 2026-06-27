@@ -16,8 +16,46 @@ ContextGraph 的方向是从关键词索引升级为语义上下文索引。升�
 - `handoff`
 - stdio MCP server
 - 本地 secret redaction 和敏感路径忽略
+- Context / Embedding / Extractor status panel，其中 Embedding 和 Extractor 目前为 disabled 默认态
+- MCP lazy diagnostics
+- `diagnose_contextgraph`
+- `reload_contextgraph`
 
-Level 0 后续还要继续加固中文 trigram 片段检索、query 结果字段和 status 可靠性展示，但不能引入模型硬依赖。
+Level 0 后续还要继续加固 watcher、中文 trigram 片段检索、query 结果字段和 status 可靠性展示，但不能引入模型硬依赖。
+
+## Engineering Priority Order
+
+后续开发按工程可信度优先，而不是按“看起来更智能”的模型能力优先：
+
+1. **Level 0 Hardening**
+   - MCP 长进程 reload / lazy refresh：已具备首版 `reload_contextgraph`
+   - MCP diagnostics：已具备首版 `diagnose_contextgraph`
+   - CLI 和 MCP 状态一致：已改为每次 tool 调用重新读取本地状态
+   - watcher：待实现
+   - status 拆 Context / Embedding / Extractor：已具备 disabled 默认态
+   - query 结果字段稳定
+   - 中文 trigram / LIKE fallback 补强
+2. **Brief Productization**
+   - `contextgraph brief`
+   - `contextgraph brief --task "修改区块链附件上传"`
+   - `contextgraph brief --file ...`
+   - `contextgraph brief --domain blockchain`
+3. **Experience-to-Source Association**
+   - 从文档、handoff、测试中抽文件路径、模块名和测试命令
+   - 建立 `RELATED_TO_FILE`、`APPLIES_TO`、`REQUIRES_TEST`
+   - 支持 `query --file` / `query --module`
+4. **Project Detector + Presets**
+   - `basic`
+   - `project`
+   - `api`
+   - `source-comments`
+   - `source`
+5. **Embedding**
+   - 等 Level 0 和关联能力稳定后再接入
+6. **LLM Extractor**
+   - 最后接入，保持可选、本地、缓存、candidate 和 schema 校验
+
+Embedding 和 LLM 不能用来掩盖基础状态、MCP 生命周期、brief 组织能力和查询字段稳定性问题。
 
 ## v0.1.x: Query Planner Lite
 
@@ -45,7 +83,42 @@ ContextGraph 不是低配 CodeGraph，也不应该进入完整源码解析、符
 
 下一阶段允许 ContextGraph 关联源码路径、模块名和测试命令，但这只是把经验节点落到具体文件或模块上，不是解析源码语义。目标是回答“这个文件/模块相关的项目经验、规则、风险和测试是什么”，而不是回答“这个函数被谁调用”。
 
-## v0.2 Priority: Experience Domains And Trust Semantics
+Source Comments 和 Swagger / OpenAPI 作为可选索引来源时，也必须遵守这个边界：
+
+Use CodeGraph for code facts.
+Use ContextGraph for project experience facts.
+
+Source comments and OpenAPI belong to ContextGraph only when they express project experience, operational constraints, interface contracts, risks, compatibility notes, or testing/deployment requirements.
+
+ContextGraph 不解析源码 AST，不提供调用链、符号引用、interface 实现或 Spring Bean 注入分析。
+
+## Second Priority: Brief Productization
+
+`brief` 应该成为 ContextGraph 的核心卖点：新 Agent 进入项目时，最需要的不是先猜 query，而是先获得可信开工视图。
+
+目标命令：
+
+```bash
+contextgraph brief
+contextgraph brief --task "修改区块链附件上传"
+contextgraph brief --file src/blockchain/upload.ts
+contextgraph brief --domain blockchain
+```
+
+目标输出：
+
+- P0 铁律
+- 当前 source of truth
+- 必须跑的测试
+- 部署/环境警告
+- 最近 handoff
+- 过期/冲突信息
+- 常见失败
+- 相关文件
+
+`brief` 要从“高优先级节点摘要”升级为 task-aware / file-aware / domain-aware 的开工面板。
+
+## Brief Foundation: Experience Domains And Trust Semantics
 
 v0.2 需要把 ContextGraph 从“能搜到经验块”推进到“能围绕任务组织经验视野”。区块链维护案例是目标场景：非区块链工程师维护多客户链上集成时，必须先看到边界、端点、txid 规则、废弃文档和历史失败模式，再改代码。
 
@@ -71,7 +144,7 @@ Task-aware retrieval:
   - `Related Files`
 - AGENTS.md 是入口，ContextGraph 是经验索引和全局视图。AGENTS.md 应告诉 Agent 使用 ContextGraph，ContextGraph 则负责按任务返回可溯源、带优先级和新鲜度的全局经验。
 
-## Next Priority: MCP Lifecycle And Index Presets
+## First Priority: Level 0 Hardening
 
 一次真实项目试用暴露出几个比 embedding 更靠前的开箱即用问题。它们属于 Level 0 hardening，必须在语义索引扩展前优先处理：
 
@@ -80,22 +153,175 @@ Task-aware retrieval:
 - MCP 需要提供明确诊断：当前 `projectRoot`、`dbPath`、数据库是否存在、`lastIndexedAt`、索引新鲜度、建议执行的命令，以及是否可能需要 IDE 重启。
 - MCP 应增加显式 reload 能力，例如 `reload_contextgraph`，用于重新读取配置和数据库状态。
 - CLI 与 MCP 必须保持状态一致：CLI 已经能读到的初始化和索引结果，MCP 不应继续报告未初始化。
-- 默认索引范围需要从单一 sources 列表升级为 preset：`basic` / `project` / `source`。
-- `init` / `index` 应具备 project detector，根据目录结构和标志文件自动识别 JS/Vue/Node、Python、Java/Maven、Go、Rust 等项目类型，并选择更合适的默认 include。
-- framework-aware defaults 要覆盖项目关键入口。例如 JS/Vue 项目应自动纳入 `src/**/*.{js,ts,vue,jsx,tsx}`、`server/**/*.{js,ts,mjs,cjs}`、`scripts/**/*.{js,ts,mjs,cjs}`、`vite.config.*`、`package.json`、`Dockerfile*`、`docker-compose*.yml`、`bruno/**/*` 和 `tests/**/*`。
-- `basic` 保持轻量，覆盖 README、AGENTS、docs、规则、测试和关键配置。
-- `project` 面向新 Agent 开箱即用，补充常见项目入口、路由、服务端代理、部署配置和脚本。
-- `source` 才允许扩展到源码全量或大范围索引，并必须有规模提示、强排除规则和可回退配置。
-- source 索引必须避免扫入低价值或高噪声内容，例如 `node_modules`、构建产物、锁文件、生成文件、大型静态资源、二进制文件和历史数据库。
-- 新增经验到源码的轻量关联能力：从文档、handoff 和 session summary 中抽取文件路径、目录、模块名和测试命令，建立 `RELATED_TO_FILE`、`APPLIES_TO` 和 `REQUIRES_TEST` 等关系。
-- 增加 `query --file <path>` 和 `query --module <name>`，查询某个源码文件或模块关联的项目规约、失败、修复、风险、测试和 handoff。
+- 增加 watcher，但 watcher 必须只维护本地索引新鲜度，不引入网络或远程服务依赖。
+- status 应拆成 Context / Embedding / Extractor，即使 embedding 和 extractor 还未实现，也要显示 disabled 默认态。
+- query 结果字段必须稳定，至少包括 source、line range、type、priority、confidence、status、freshness、matched query。
+- 继续补强中文 trigram / LIKE fallback。
 - status 应强调 context freshness，而不是假装提供 code index freshness。
 
 这些修复的验收目标是：用户完成 `contextgraph init && contextgraph index` 后，无论通过 CLI 还是 MCP 查询，都能得到一致、可解释、可恢复的状态。
 
-## Level 1: Embedding Mode
+## Third Priority: Experience-to-Source Association
 
-目标：在 Level 0 之上增加可选本地 embedding，让 ContextGraph 支持 semantic search、hybrid search 和 project experience blocks 之间的 candidate semantic edges。
+这个阶段比 embedding 更早产生价值。ContextGraph 不解析 AST，只把经验事实关联到文件、目录、模块和测试命令。
+
+能力范围：
+
+- 从文档、handoff、测试和 session summary 中抽取文件路径、目录、模块名和测试命令。
+- 从 query / brief 输入中识别文件路径和模块名。
+- 建立 `RELATED_TO_FILE`、`APPLIES_TO`、`REQUIRES_TEST`、`MENTIONS_MODULE`。
+- 增加 `query --file <path>` 和 `query --module <name>`。
+- 让 Agent 在改某个文件前知道相关规约、历史失败、必跑测试和环境风险。
+
+明确边界：
+
+- 这些关系是项目经验关联，不是调用链。
+- 不声明“这个函数调用了谁”。
+- 不声明“这个 interface 有哪些实现”。
+- 不推断 Spring Bean 注入关系。
+
+## Fourth Priority: Project Detector And Presets
+
+默认 preset 不能太贪。目标是安全、有用、可解释，而不是默认扫完整源码树。
+
+Preset 规划：
+
+- `basic` 保持轻量，覆盖 README、AGENTS、docs、规则、测试和关键配置。
+- `project` 面向新 Agent 开箱即用，补充 package/pom/docker/bruno/playwright/openapi、常见项目入口、部署配置和脚本。
+- `api` 索引 OpenAPI / Swagger 接口契约。
+- `source-comments` 只提取高价值源码注释。
+- `source` 需要显式用户确认，仍然不做代码图谱。
+
+Project detector:
+
+- `init` / `index` 应根据目录结构和标志文件自动识别 JS/Vue/Node、Python、Java/Maven、Go、Rust 等项目类型，并选择更合适的默认 include。
+- framework-aware defaults 要覆盖项目关键入口。例如 JS/Vue 项目应自动纳入 `src/**/*.{js,ts,vue,jsx,tsx}`、`server/**/*.{js,ts,mjs,cjs}`、`scripts/**/*.{js,ts,mjs,cjs}`、`vite.config.*`、`package.json`、`Dockerfile*`、`docker-compose*.yml`、`bruno/**/*` 和 `tests/**/*`。
+- source 索引必须避免扫入低价值或高噪声内容，例如 `node_modules`、构建产物、锁文件、生成文件、大型静态资源、二进制文件和历史数据库。
+
+## v0.2.x: API Contract Preset
+
+目标：把 Swagger / OpenAPI 作为接口契约纳入项目经验图谱，让 Agent 在修改接口、测试、客户端集成或部署配置前能看到当前接口边界。
+
+新增命令：
+
+```bash
+contextgraph index --preset api
+```
+
+默认扫描：
+
+- `openapi.json`
+- `openapi.yaml`
+- `swagger.json`
+- `swagger.yaml`
+- `docs/**/openapi*.json`
+- `docs/**/swagger*.yaml`
+
+解析范围：
+
+- endpoint
+- method
+- path
+- request params
+- request body
+- response schema
+- tags
+- deprecated 状态
+
+生成节点：
+
+- `ApiEndpoint`
+- `ApiSchema`
+- `ApiParameter`
+- `ApiResponse`
+- `ApiContract`
+
+查询行为：
+
+- `query` / `brief` 可以召回相关接口契约。
+- API 契约节点优先级高于普通 README 描述。
+- deprecated endpoint 必须以 warning 或 deprecated status 呈现。
+- API preset 不做后端源码调用链分析，也不推断 controller / service / DAO 关系。
+
+## v0.2.x / v0.3.x: Source Comments Preset
+
+目标：索引“源码附近的项目经验”，但不索引普通代码实现，不进入源码知识图谱赛道。
+
+新增命令：
+
+```bash
+contextgraph index --preset source-comments
+```
+
+支持语言：
+
+- Java
+- JavaScript
+- TypeScript
+- Vue
+- Python
+- Go
+
+只保留高价值注释。关键词包括：
+
+- 必须
+- 禁止
+- 不能
+- 不得
+- 不要
+- 注意
+- 坑
+- 兼容
+- 历史
+- 生产
+- 部署
+- 测试
+- 回滚
+- 风险
+- 不能删除
+- 不能修改
+- TODO
+- FIXME
+- HACK
+- deprecated
+- legacy
+- must
+- never
+- do not
+- warning
+- production
+
+生成 `SourceComment` 节点，并分类为：
+
+- `Rule`
+- `Risk`
+- `Failure`
+- `Fix`
+- `EnvironmentFact`
+- `Decision`
+- `CompatibilityNote`
+- `Todo`
+- `DeprecatedNote`
+
+SourceComment 默认语义：
+
+- `status=candidate`
+- `confidence=medium`
+- 必须保留 source file 和 line range
+- query 结果必须明确显示来自 `source_comment`
+- 不默认全量开启，必须通过 preset 或配置启用
+
+限制：
+
+- 不索引普通代码实现。
+- 不做 AST 语义解析。
+- 不做调用链分析。
+- 不做符号引用或 interface 实现分析。
+- 不把注释直接当作 confirmed rule；除非被 confirmed docs、handoff、测试验证或用户确认强化。
+
+## Fifth Priority: Embedding Mode
+
+目标：等 Level 0、brief、经验关联源码和 preset 稳定后，再增加可选本地 embedding，让 ContextGraph 支持 semantic search、hybrid search 和 project experience blocks 之间的 candidate semantic edges。该阶段同时负责把文档规则、源码注释、OpenAPI 契约、测试脚本、handoff 和环境配置连接起来。
 
 命令规划：
 
@@ -128,9 +354,18 @@ Provider 预留：
 - 新增 candidate edge 类型：`SEMANTICALLY_RELATED`、`SAME_DOMAIN`、`MAY_APPLY_TO`、`POSSIBLY_CONFLICTS`、`POSSIBLY_REINFORCES`。
 - confirmed edge 只能来自显式规则、用户确认、handoff 明确说明、测试验证或 LLM extractor 结构化判断。
 
-## Level 2: Local LLM Extract Mode
+计划关联：
 
-目标：在 Level 1 之上增加可选本地 LLM 抽取，把高价值上下文转成结构化经验节点。
+- 文档规则 ↔ 源码注释
+- OpenAPI endpoint ↔ 测试脚本
+- OpenAPI endpoint ↔ handoff 经验
+- OpenAPI endpoint ↔ 环境配置
+
+这些关联默认是 candidate semantic edges，必须带 score、provider、model 和 status。
+
+## Sixth Priority: Local LLM Extract Mode
+
+目标：在 embedding 和基础治理稳定后，最后增加可选本地 LLM 抽取，把高价值上下文转成结构化经验节点。
 
 命令规划：
 
@@ -227,6 +462,12 @@ Overall reliability:  Medium
 - JS/Vue/Node 项目在不手动编辑 sources 的情况下也能索引到有效项目入口和源码上下文。
 - 默认 indexing preset 不会意外扫入整个源码树；大范围 source 索引必须显式启用。
 - source preset 必须有规模提示、排除规则和测试覆盖。
+- `api` preset 能索引 OpenAPI / Swagger，并生成 ApiEndpoint / ApiSchema / ApiParameter / ApiResponse / ApiContract。
+- API 契约节点能被 `query` / `brief` 召回，且优先级高于普通 README 描述。
+- deprecated API 必须显示 deprecated status 或 warning。
+- `source-comments` preset 只提取高价值注释，不索引普通源码实现。
+- SourceComment 默认是 candidate、medium confidence，并保留 source file 与 line range。
+- query 结果必须明确显示 source comment 来源，避免 Agent 把过期注释误认为 confirmed rule。
 - README 和命令输出必须明确：ContextGraph 是项目经验事实层，不替代 CodeGraph / Sourcegraph / LSP 的代码事实层。
 - `query --file` / `query --module` 能返回关联的规则、失败、修复、测试要求和 handoff，并标明这些是经验关联，不是代码调用链。
 - `explain-query` 能展示 normalize、intent、entities、expanded queries 和 retriever plan。

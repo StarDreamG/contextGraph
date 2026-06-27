@@ -12,6 +12,40 @@ AGENTS.md should remain the human-readable entrypoint for agents. ContextGraph i
 
 ## Architecture Levels
 
+## Current Engineering Priority
+
+The next work should be ordered by trust and usability, not by model sophistication.
+
+1. Level 0 Hardening
+   - MCP long-process reload / lazy refresh: first slice implemented with `reload_contextgraph`
+   - MCP diagnostics: first slice implemented with `diagnose_contextgraph`
+   - CLI and MCP state consistency: first slice uses lazy status reads on every MCP tool call
+   - watcher
+   - status split into Context / Embedding / Extractor: first slice implemented with disabled defaults
+   - stable query result fields
+   - stronger Chinese trigram / LIKE fallback
+2. Brief Productization
+   - `contextgraph brief`
+   - `contextgraph brief --task "修改区块链附件上传"`
+   - `contextgraph brief --file ...`
+   - `contextgraph brief --domain blockchain`
+3. Experience-to-Source Association
+   - extract file paths, module names, and test commands from docs, handoff, and tests
+   - create `RELATED_TO_FILE`, `APPLIES_TO`, and `REQUIRES_TEST`
+   - add `query --file` and `query --module`
+4. Project Detector + Presets
+   - `basic`
+   - `project`
+   - `api`
+   - `source-comments`
+   - `source`
+5. Embedding
+   - optional and only after the base layer is stable
+6. LLM Extractor
+   - optional, local-first, cached, candidate by default, and schema validated
+
+Embedding must not hide weak status semantics, stale MCP state, unclear brief output, or unstable query fields.
+
 ### Level 0: Base Mode
 
 Level 0 is the always-on foundation:
@@ -89,19 +123,84 @@ Required design response:
 - Add an MCP reload tool, tentatively `reload_contextgraph`, to force config and database state refresh without requiring an IDE restart when the host supports long-lived MCP sessions.
 - Add clear diagnostics when reload is impossible because the IDE owns process lifecycle.
 - Keep CLI and MCP state semantics aligned: if CLI status is fresh, MCP should either show the same state or explain why the MCP process cannot refresh.
-- Replace the single default source-list mindset with indexing presets: `basic`, `project`, and `source`.
-- Add a project detector that chooses framework-aware defaults from marker files and directories instead of requiring an agent to edit raw globs.
-- `basic` should remain small and safe.
-- `project` should improve new-agent onboarding with common source entrypoints, framework files, deployment/runtime files, and test/API fixtures.
-- `source` should be explicit, bounded, and guarded by ignore rules plus scale warnings.
-- Add source association without source-code parsing: extract file paths, directories, module names, and test commands from docs, handoff, and session summaries, then connect them to experience nodes.
-- Add file/module scoped queries so agents can ask which project rules, failures, fixes, tests, and handoffs apply to a file or module.
+- Add watcher support for local freshness only.
+- Split status into Context / Embedding / Extractor sections.
+- Stabilize query result fields: source, line range, type, priority, confidence, status, freshness, and matched query.
+- Strengthen Chinese trigram / LIKE fallback.
 
 This work is still Level 0: it must not introduce model providers, network calls, vector databases, or query-time LLM use.
 
+### Level 0.6: Brief Productization
+
+`brief` is the product entrypoint for a new agent entering a project. It should answer what the agent must know before acting.
+
+Target commands:
+
+```bash
+contextgraph brief
+contextgraph brief --task "修改区块链附件上传"
+contextgraph brief --file src/blockchain/upload.ts
+contextgraph brief --domain blockchain
+```
+
+Target sections:
+
+- P0 Rules
+- Current Source of Truth
+- Required Tests
+- Deployment / Environment Warnings
+- Recent Handoff
+- Deprecated / Conflicting Context
+- Known Failure Modes
+- Related Files
+
+This is more important than embedding because it directly supports the root product goal: stop new agents from acting on narrow grep/read results.
+
+### Level 0.7: Experience-to-Source Association
+
+This stage links project experience to code locations without becoming a code graph.
+
+Allowed:
+
+- extract file paths from docs, handoff, tests, and session summaries
+- extract module names from text
+- extract test commands and test file paths
+- infer that a rule, failure, fix, or test requirement applies to a file/module when the source text says so
+- support `query --file <path>`
+- support `query --module <name>`
+
+Relations:
+
+- `RELATED_TO_FILE`
+- `APPLIES_TO`
+- `REQUIRES_TEST`
+- `MENTIONS_MODULE`
+
+Not allowed:
+
+- AST parsing for semantics
+- call chains
+- symbol references
+- interface implementations
+- Spring Bean injection analysis
+
+### Level 0.8: Project Detector And Presets
+
+Default indexing should be safe and useful, not greedy.
+
+Preset plan:
+
+- `basic`: AGENTS, README, docs, handoff, config, test docs
+- `project`: package, pom, docker, bruno, playwright, openapi, common project entrypoints, deployment config, scripts
+- `api`: OpenAPI / Swagger
+- `source-comments`: high-value comments only
+- `source`: explicit user confirmation, still not a code graph
+
+`source` must have scale warnings, strong excludes, and a clear rollback path.
+
 ### Level 1: Embedding Mode
 
-Level 1 adds optional semantic search:
+Level 1 comes after Level 0 hardening, brief productization, experience-to-source association, and presets. It adds optional semantic search:
 
 - local embedding provider interface
 - `embeddings` SQLite table
@@ -133,7 +232,7 @@ Embedding is not only for query-time semantic recall. It should also build candi
 
 ### Level 2: Local LLM Extract Mode
 
-Level 2 adds optional structured extraction from high-value context:
+Level 2 is deliberately after embedding and base governance. It adds optional structured extraction from high-value context:
 
 - local extractor provider interface
 - high-value block selection
@@ -684,12 +783,7 @@ Do not build these in the next phase:
 
 ## Implementation Slices
 
-1. Level 0 hardening
-   - formalize trigram Chinese fragment scoring
-   - ensure query results always include source, line range, confidence, and status
-   - split status into Context / Embedding / Extractor sections with disabled defaults
-
-2. Query Planner Lite
+1. Query Planner Lite
    - add `src/query/queryPlanner.ts`
    - add natural-language normalization, intent inference, entity extraction, and query expansion
    - make `get_relevant_context` use multi-query retrieval instead of one raw FTS query
@@ -697,23 +791,25 @@ Do not build these in the next phase:
    - add `contextgraph explain-query "<query>"`
    - add tests for `智策星隔离要求，不能占用哪些端口和资源`
 
-3. MCP lifecycle hardening
-   - lazy re-check project initialization and database state on every MCP tool call
-   - add `reload_contextgraph`
-   - return projectRoot/dbPath/configPath/lastIndexedAt diagnostics from MCP status
-   - provide actionable messages for `not initialized`, `not indexed`, `stale`, and `host restart required`
+2. Level 0 hardening
+   - lazy re-check project initialization and database state on every MCP tool call: first slice implemented
+   - add `reload_contextgraph`: first slice implemented
+   - return projectRoot/dbPath/configPath/lastIndexedAt diagnostics from MCP status: first slice implemented
+   - provide actionable messages for `not initialized`, `not indexed`, and `stale`: first slice implemented
+   - add watcher
+   - split status into Context / Embedding / Extractor with disabled defaults: first slice implemented
+   - stabilize query result fields
+   - formalize trigram Chinese fragment scoring and LIKE fallback
    - add tests for MCP started before init and then recovering after init/index
 
-4. Index preset hardening
-   - add `basic`, `project`, and `source` presets
-   - add project detector for JS/Node/Vue, Python, Java/Maven, Go, Rust, and docs-heavy repositories
-   - add framework-aware default includes for detected project types
-   - keep default indexing safe and useful for new-agent onboarding
-   - require explicit source preset for broad code indexing
-   - add scale warnings and stronger excludes
-   - add tests for project detection, preset expansion, and large-project guardrails
+3. Brief productization
+   - add task-aware brief input
+   - add file-aware brief input
+   - add domain-aware brief input
+   - return P0 Rules, Current Source of Truth, Required Tests, Deployment / Environment Warnings, Recent Handoff, Deprecated / Conflicting Context, Known Failure Modes, and Related Files
+   - add tests for P0-first ordering, stale warnings, task filtering, file filtering, and domain filtering
 
-5. Source association and scoped query
+4. Source association and scoped query
    - extract file paths, module names, and test commands from high-value context
    - add `RELATED_TO_FILE`, `APPLIES_TO`, `REQUIRES_TEST`, and `MENTIONS_MODULE` relations
    - add `contextgraph query --file <path>`
@@ -721,14 +817,22 @@ Do not build these in the next phase:
    - keep relationship output explicit that it is project-experience context, not code intelligence
    - add tests for path extraction, test command extraction, file query, and module query
 
-6. Knowledge domain, trust semantics, and task-aware brief
+5. Project detector and preset hardening
+   - add `basic`, `project`, `api`, `source-comments`, and `source` presets
+   - add project detector for JS/Node/Vue, Python, Java/Maven, Go, Rust, and docs-heavy repositories
+   - add framework-aware default includes for detected project types
+   - keep default indexing safe and useful for new-agent onboarding
+   - require explicit source preset for broad code indexing
+   - add scale warnings and stronger excludes
+   - add tests for project detection, preset expansion, and large-project guardrails
+
+6. Knowledge domain and trust semantics
    - add Knowledge Domain metadata and deterministic domain detection
    - support initial domains: `blockchain`, `deployment`, `testing`, `frontend`, `backend`
    - normalize priority around `P0`, `P1`, and `P2` for brief/query
    - add status semantics: `confirmed`, `candidate`, `deprecated`, `conflict`, `stale`
    - add `supersedes` relation and deprecated-doc handling
    - add `EnvironmentFact`
-   - add `contextgraph brief "<task>"`
    - add tests for P0-first ordering, domain inference, status rendering, and supersedes behavior
 
 7. Embedding interface and state

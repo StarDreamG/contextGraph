@@ -9,6 +9,11 @@ export function registerStatusCommand(program: Command): void {
     console.log(`Project:        ${process.cwd()}`);
     console.log(`Status:         ${status.status}`);
     console.log(`Reliability:    ${status.reliability}`);
+    console.log(`Context index:  ${status.contextIndex.status}`);
+    console.log(`Embedding index:${formatDerivedStatus(status.embeddingIndex.status)}`);
+    console.log(`Extractor index:${formatDerivedStatus(status.extractorIndex.status)}`);
+    console.log(`Search mode:    ${status.searchMode}`);
+    console.log(`Overall reliability: ${status.overallReliability}`);
     console.log(`Last indexed:   ${status.lastIndexedAt ?? "never"}`);
     console.log(`Current HEAD:   ${status.currentGitHead ?? "none"}`);
     console.log(`Indexed HEAD:   ${status.indexedGitHead ?? "none"}`);
@@ -21,7 +26,7 @@ export function registerStatusCommand(program: Command): void {
     console.log(`Failed blocks:  ${status.failedBlocks}`);
     console.log(`Conflicts:      ${status.conflicts}`);
     console.log("MCP server:     stopped");
-    console.log("Watcher:        stopped");
+    console.log(`Watcher:        ${status.watcher.status}`);
     if (status.warnings.length > 0) {
       console.log("Warning:");
       for (const warning of status.warnings) {
@@ -29,4 +34,8 @@ export function registerStatusCommand(program: Command): void {
       }
     }
   });
+}
+
+function formatDerivedStatus(status: string): string {
+  return status.padStart(9, " ");
 }
