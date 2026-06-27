@@ -10,6 +10,7 @@ import { registerInitCommand } from "../commands/initCommand.js";
 import { registerMcpCommand } from "../commands/mcpCommand.js";
 import { registerQueryCommand } from "../commands/queryCommand.js";
 import { registerStatusCommand } from "../commands/statusCommand.js";
+import { registerWatchCommand } from "../commands/watchCommand.js";
 
 export function buildProgram(): Command {
   const program = new Command();
@@ -20,6 +21,7 @@ export function buildProgram(): Command {
   registerInitCommand(program);
   registerIndexCommand(program);
   registerStatusCommand(program);
+  registerWatchCommand(program);
   registerDoctorCommand(program);
   registerBriefCommand(program);
   registerQueryCommand(program);

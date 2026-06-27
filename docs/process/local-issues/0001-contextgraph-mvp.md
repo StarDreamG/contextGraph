@@ -25,6 +25,8 @@ ContextGraph 需要为编程 Agent 提供本地、可查询、可信的新鲜上
 - 存量历史 session 导入不在 MVP 内实现，但 Phase 2 必须实现，不能从路线中移除。
 - 项目工具环境画像不在 MVP 内实现，但 Phase 2 必须从历史 session 中抽取该项目常用 MCP server、skills、插件/连接器和自动化工具。
 
+Note: Watch 模式不属于 2026-06-15 的原始 MVP 范围，但已在后续 `0.1.x` Level 0 hardening 中实现首版 `contextgraph watch`。
+
 ## Acceptance criteria
 
 - [ ] 空项目可执行 `contextgraph init`。

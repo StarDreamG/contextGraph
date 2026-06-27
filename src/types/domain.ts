@@ -125,6 +125,10 @@ export interface WatcherSnapshot {
   status: WatcherStatus;
   mode: "disabled" | "local";
   message: string;
+  pid?: number;
+  startedAt?: string;
+  updatedAt?: string;
+  watchedSources?: number;
 }
 
 export interface StatusSnapshot {

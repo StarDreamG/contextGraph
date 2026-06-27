@@ -9,6 +9,7 @@ import { openDatabase } from "../storage/database.js";
 import { GraphRepository } from "../storage/repositories.js";
 import type { StatusSnapshot } from "../types/domain.js";
 import { buildStatusSnapshot } from "./statusSnapshot.js";
+import { readWatcherSnapshot } from "./watchState.js";
 
 interface IndexedSource {
   id: string;
@@ -26,6 +27,7 @@ export async function getContextStatus(projectRoot: string): Promise<StatusSnaps
     await access(configPath);
   } catch {
     return staleLow({
+      projectRoot,
       currentHead,
       warnings: ["ContextGraph is not initialized. Run: contextgraph init"]
     });
@@ -79,11 +81,12 @@ export async function getContextStatus(projectRoot: string): Promise<StatusSnaps
     pendingBlocks: 0,
     failedBlocks,
     conflicts: 0,
-    warnings: isStale ? ["ContextGraph is not up to date. Run: contextgraph index"] : []
+    warnings: isStale ? ["ContextGraph is not up to date. Run: contextgraph index"] : [],
+    watcher: await readWatcherSnapshot(projectRoot)
   });
 }
 
-function staleLow(input: { currentHead: string | null; warnings: string[] }): StatusSnapshot {
+async function staleLow(input: { projectRoot: string; currentHead: string | null; warnings: string[] }): Promise<StatusSnapshot> {
   return buildStatusSnapshot({
     status: "Stale",
     reliability: "Low",
@@ -98,7 +101,8 @@ function staleLow(input: { currentHead: string | null; warnings: string[] }): St
     pendingBlocks: 0,
     failedBlocks: 0,
     conflicts: 0,
-    warnings: input.warnings
+    warnings: input.warnings,
+    watcher: await readWatcherSnapshot(input.projectRoot)
   });
 }
 

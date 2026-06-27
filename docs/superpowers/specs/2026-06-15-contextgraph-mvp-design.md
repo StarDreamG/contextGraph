@@ -47,6 +47,8 @@ ContextGraph 将稳定的项目上下文预先索引到本地图谱中，并通�
 - 将全局 npm 安装或 `npm link` 作为主要使用方式。
 - 存量历史 Agent session 导入不属于 MVP，但它是第二阶段必做能力，不得在后续路线中删除。
 
+Note: Watch 模式不属于 2026-06-15 的原始 MVP 范围，但已在后续 `0.1.x` Level 0 hardening 中实现首版 `contextgraph watch`。
+
 ## 第二阶段必做：存量 Session 导入
 
 MVP 只记录从 `contextgraph handoff` 开始的新会话摘要，因此它能证明闭环，但不能完全解决“已有项目开箱即用”的问题。第二阶段必须加入存量 Agent session 导入，尤其是本机 Codex 历史 session。

@@ -1,4 +1,5 @@
-import type { GraphStatus, Reliability, StatusSnapshot } from "../types/domain.js";
+import type { GraphStatus, Reliability, StatusSnapshot, WatcherSnapshot } from "../types/domain.js";
+import { stoppedWatcher } from "./watchState.js";
 
 export interface StatusSnapshotInput {
   indexVersion?: number;
@@ -16,6 +17,7 @@ export interface StatusSnapshotInput {
   failedBlocks: number;
   conflicts: number;
   warnings: string[];
+  watcher?: WatcherSnapshot;
 }
 
 export function buildStatusSnapshot(input: StatusSnapshotInput): StatusSnapshot {
@@ -54,10 +56,6 @@ export function buildStatusSnapshot(input: StatusSnapshotInput): StatusSnapshot 
       stale: 0
     },
     searchMode: "FTS + trigram",
-    watcher: {
-      status: "stopped",
-      mode: "disabled",
-      message: "Watcher is not running. Run contextgraph index manually after source changes."
-    }
+    watcher: input.watcher ?? stoppedWatcher()
   };
 }

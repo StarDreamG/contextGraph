@@ -85,6 +85,7 @@ npm link
 contextgraph init
 contextgraph index
 contextgraph status
+contextgraph watch --debounce 500
 contextgraph doctor
 contextgraph brief
 contextgraph query "测试"
@@ -105,6 +106,7 @@ npm run contextgraph -- status
 - `init`：创建 `.contextgraph`、`graph.db`、配置、状态文件和 AGENTS.md 指引。
 - `index`：扫描配置的 sources，脱敏内容，生成 blocks、nodes、FTS 和状态。
 - `status`：显示新鲜度和可信度。
+- `watch`：监听本地已配置 sources，文件变化后自动 debounce 重建索引。
 - `doctor`：检查 Node、SQLite 原生依赖、项目初始化状态和索引健康度。
 - `brief`：为新 Agent 输出最高优先级的开工摘要。
 - `query`：搜索相关项目上下文。
@@ -350,7 +352,26 @@ ContextGraph does not make agents better at grep. It removes the need for agents
 
 详细阶段计划见 [ROADMAP.md](./ROADMAP.md)，后续开发设计见 [docs/dev-plan.md](./docs/dev-plan.md)。
 
-当前 `0.1.x` 已开始补齐 Level 0 hardening：`status` 输出 Context / Embedding / Extractor 分层，MCP tool 每次调用都会重新检查本地 `.contextgraph` 状态，并提供 `diagnose_contextgraph` 和 `reload_contextgraph`。下一步继续补 watcher、brief 产品化、源码路径/模块/测试命令关联，以及谨慎的 preset 体系，避免默认索引过窄或源码索引失控。
+当前 `0.1.x` 已开始补齐 Level 0 hardening：`status` 输出 Context / Embedding / Extractor 分层，MCP tool 每次调用都会重新检查本地 `.contextgraph` 状态，并提供 `diagnose_contextgraph` 和 `reload_contextgraph`。`contextgraph watch` 已支持本地文件监听和自动重建索引，不联网、不起 TCP 服务。下一步继续补 brief 产品化、源码路径/模块/测试命令关联，以及谨慎的 preset 体系，避免默认索引过窄或源码索引失控。
+
+## Watch
+
+启动本地 watcher：
+
+```bash
+contextgraph watch
+contextgraph watch --debounce 500
+```
+
+Watcher 只监听当前配置命中的本地 source 文件。文件变化后会在 debounce 窗口结束后运行本地 `index`，并把 watcher 状态写入 `.contextgraph/watcher.json`，供 `contextgraph status` 显示。
+
+边界：
+
+- 不联网。
+- 不启动 TCP 服务。
+- 不调用模型。
+- 不扫描未配置的大范围源码。
+- 不替代 IDE / LSP / CodeGraph 的代码索引。
 
 ## MCP
 
@@ -386,7 +407,7 @@ MCP 使用 stdio。每次 tool 调用都会 lazy refresh 本地配置和数据�
 
 ## MVP 限制
 
-第一版不包含 watch 模式、历史 session 导入、embedding、向量数据库、远程 LLM 抽取、规则冲突检测、UI、VS Code 扩展、Codex 侧边栏、云同步或团队权限。
+第一版不包含历史 session 导入、embedding、向量数据库、远程 LLM 抽取、规则冲突检测、UI、VS Code 扩展、Codex 侧边栏、云同步或团队权限。
 
 历史 session 导入是必做的 Phase 2。它应该通过显式、脱敏、可审计、摘要优先的流程导入现有项目相关 Codex sessions，让已有项目初始化后立刻有可查询的历史经验。
 

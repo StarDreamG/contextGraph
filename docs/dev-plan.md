@@ -20,7 +20,7 @@ The next work should be ordered by trust and usability, not by model sophisticat
    - MCP long-process reload / lazy refresh: first slice implemented with `reload_contextgraph`
    - MCP diagnostics: first slice implemented with `diagnose_contextgraph`
    - CLI and MCP state consistency: first slice uses lazy status reads on every MCP tool call
-   - watcher
+   - watcher: first slice implemented with `contextgraph watch`
    - status split into Context / Embedding / Extractor: first slice implemented with disabled defaults
    - stable query result fields
    - stronger Chinese trigram / LIKE fallback
@@ -123,7 +123,7 @@ Required design response:
 - Add an MCP reload tool, tentatively `reload_contextgraph`, to force config and database state refresh without requiring an IDE restart when the host supports long-lived MCP sessions.
 - Add clear diagnostics when reload is impossible because the IDE owns process lifecycle.
 - Keep CLI and MCP state semantics aligned: if CLI status is fresh, MCP should either show the same state or explain why the MCP process cannot refresh.
-- Add watcher support for local freshness only.
+- Add watcher support for local freshness only: first slice implemented with `contextgraph watch`.
 - Split status into Context / Embedding / Extractor sections.
 - Stabilize query result fields: source, line range, type, priority, confidence, status, freshness, and matched query.
 - Strengthen Chinese trigram / LIKE fallback.
@@ -796,7 +796,7 @@ Do not build these in the next phase:
    - add `reload_contextgraph`: first slice implemented
    - return projectRoot/dbPath/configPath/lastIndexedAt diagnostics from MCP status: first slice implemented
    - provide actionable messages for `not initialized`, `not indexed`, and `stale`: first slice implemented
-   - add watcher
+   - add watcher: first slice implemented
    - split status into Context / Embedding / Extractor with disabled defaults: first slice implemented
    - stabilize query result fields
    - formalize trigram Chinese fragment scoring and LIKE fallback

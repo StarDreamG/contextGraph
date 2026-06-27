@@ -255,7 +255,7 @@ The architecture should be implemented in this order:
    - MCP long-process reload / lazy refresh: first slice implemented through `reload_contextgraph`
    - MCP diagnostics: first slice implemented through `diagnose_contextgraph`
    - CLI and MCP state consistency: first slice uses lazy status reads on every MCP tool call
-   - watcher: pending
+   - watcher: first slice implemented through `contextgraph watch`
    - status split into Context / Embedding / Extractor: first slice implemented with disabled defaults
    - stable query result fields
    - stronger Chinese trigram / LIKE fallback

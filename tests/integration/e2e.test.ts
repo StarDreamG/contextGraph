@@ -81,6 +81,9 @@ describe("CLI e2e", () => {
       const mcpHelp = await execFileAsync("node", [cli, "mcp", "--help"], { cwd: project.root });
       expect(mcpHelp.stdout).toContain("--project <path>");
 
+      const watchHelp = await execFileAsync("node", [cli, "watch", "--help"], { cwd: project.root });
+      expect(watchHelp.stdout).toContain("--debounce <ms>");
+
       const query = await execFileAsync("node", [cli, "query", "测试"], { cwd: project.root });
       expect(query.stdout).toContain("Relevant Context:");
 

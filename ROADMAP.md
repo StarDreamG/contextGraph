@@ -20,8 +20,9 @@ ContextGraph 的方向是从关键词索引升级为语义上下文索引。升�
 - MCP lazy diagnostics
 - `diagnose_contextgraph`
 - `reload_contextgraph`
+- local watcher with `contextgraph watch`
 
-Level 0 后续还要继续加固 watcher、中文 trigram 片段检索、query 结果字段和 status 可靠性展示，但不能引入模型硬依赖。
+Level 0 后续还要继续加固中文 trigram 片段检索、query 结果字段和 status 可靠性展示，但不能引入模型硬依赖。
 
 ## Engineering Priority Order
 
@@ -31,7 +32,7 @@ Level 0 后续还要继续加固 watcher、中文 trigram 片段检索、query �
    - MCP 长进程 reload / lazy refresh：已具备首版 `reload_contextgraph`
    - MCP diagnostics：已具备首版 `diagnose_contextgraph`
    - CLI 和 MCP 状态一致：已改为每次 tool 调用重新读取本地状态
-   - watcher：待实现
+   - watcher：已具备首版 `contextgraph watch`
    - status 拆 Context / Embedding / Extractor：已具备 disabled 默认态
    - query 结果字段稳定
    - 中文 trigram / LIKE fallback 补强
@@ -153,7 +154,7 @@ Task-aware retrieval:
 - MCP 需要提供明确诊断：当前 `projectRoot`、`dbPath`、数据库是否存在、`lastIndexedAt`、索引新鲜度、建议执行的命令，以及是否可能需要 IDE 重启。
 - MCP 应增加显式 reload 能力，例如 `reload_contextgraph`，用于重新读取配置和数据库状态。
 - CLI 与 MCP 必须保持状态一致：CLI 已经能读到的初始化和索引结果，MCP 不应继续报告未初始化。
-- 增加 watcher，但 watcher 必须只维护本地索引新鲜度，不引入网络或远程服务依赖。
+- 增加 watcher：已具备首版 `contextgraph watch`，只维护本地索引新鲜度，不引入网络或远程服务依赖。
 - status 应拆成 Context / Embedding / Extractor，即使 embedding 和 extractor 还未实现，也要显示 disabled 默认态。
 - query 结果字段必须稳定，至少包括 source、line range、type、priority、confidence、status、freshness、matched query。
 - 继续补强中文 trigram / LIKE fallback。
