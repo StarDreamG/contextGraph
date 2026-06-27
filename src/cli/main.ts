@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { Command } from "commander";
 import { registerBriefCommand } from "../commands/briefCommand.js";
 import { registerDoctorCommand } from "../commands/doctorCommand.js";
+import { registerEmbeddingCommand } from "../commands/embeddingCommand.js";
 import { registerExplainQueryCommand } from "../commands/explainQueryCommand.js";
 import { registerHandoffCommand } from "../commands/handoffCommand.js";
 import { registerIndexCommand } from "../commands/indexCommand.js";
@@ -23,6 +24,7 @@ export function buildProgram(): Command {
   registerStatusCommand(program);
   registerWatchCommand(program);
   registerDoctorCommand(program);
+  registerEmbeddingCommand(program);
   registerBriefCommand(program);
   registerQueryCommand(program);
   registerExplainQueryCommand(program);

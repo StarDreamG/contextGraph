@@ -71,6 +71,21 @@ CREATE TABLE IF NOT EXISTS status (
   value TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS embeddings (
+  block_id TEXT NOT NULL,
+  node_id TEXT,
+  provider TEXT NOT NULL,
+  model TEXT NOT NULL,
+  dimensions INTEGER NOT NULL,
+  vector BLOB NOT NULL,
+  block_hash TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (block_id, provider, model),
+  FOREIGN KEY(block_id) REFERENCES blocks(id) ON DELETE CASCADE,
+  FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE SET NULL
+);
+
 CREATE VIRTUAL TABLE IF NOT EXISTS nodes_fts USING fts5(
   node_id UNINDEXED,
   title,
@@ -82,5 +97,6 @@ CREATE INDEX IF NOT EXISTS idx_sources_path ON sources(path);
 CREATE INDEX IF NOT EXISTS idx_blocks_source ON blocks(source_id);
 CREATE INDEX IF NOT EXISTS idx_nodes_source ON nodes(source_id);
 CREATE INDEX IF NOT EXISTS idx_nodes_block ON nodes(block_id);
+CREATE INDEX IF NOT EXISTS idx_embeddings_provider_model ON embeddings(provider, model);
 `);
 }

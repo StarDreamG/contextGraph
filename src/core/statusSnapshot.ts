@@ -1,4 +1,4 @@
-import type { GraphStatus, Reliability, StatusSnapshot, WatcherSnapshot } from "../types/domain.js";
+import type { DerivedIndexSnapshot, GraphStatus, Reliability, StatusSnapshot, WatcherSnapshot } from "../types/domain.js";
 import { stoppedWatcher } from "./watchState.js";
 
 export interface StatusSnapshotInput {
@@ -17,13 +17,19 @@ export interface StatusSnapshotInput {
   failedBlocks: number;
   conflicts: number;
   warnings: string[];
+  embeddingIndex?: DerivedIndexSnapshot;
+  extractorIndex?: DerivedIndexSnapshot;
+  searchMode?: StatusSnapshot["searchMode"];
   watcher?: WatcherSnapshot;
 }
 
 export function buildStatusSnapshot(input: StatusSnapshotInput): StatusSnapshot {
+  const embeddingIndex = input.embeddingIndex ?? disabledDerivedIndex();
+  const extractorIndex = input.extractorIndex ?? disabledDerivedIndex();
+  const overallReliability = combineReliability(input.reliability, embeddingIndex, extractorIndex);
   return {
     ...input,
-    overallReliability: input.reliability,
+    overallReliability,
     contextIndex: {
       status: input.status,
       reliability: input.reliability,
@@ -39,23 +45,40 @@ export function buildStatusSnapshot(input: StatusSnapshotInput): StatusSnapshot 
       failedBlocks: input.failedBlocks,
       conflicts: input.conflicts
     },
-    embeddingIndex: {
-      status: "disabled",
-      provider: "none",
-      model: null,
-      pending: 0,
-      failed: 0,
-      stale: 0
-    },
-    extractorIndex: {
-      status: "disabled",
-      provider: "none",
-      model: null,
-      pending: 0,
-      failed: 0,
-      stale: 0
-    },
-    searchMode: "FTS + trigram",
+    embeddingIndex,
+    extractorIndex,
+    searchMode: input.searchMode ?? "FTS + trigram",
     watcher: input.watcher ?? stoppedWatcher()
   };
+}
+
+function disabledDerivedIndex(): DerivedIndexSnapshot {
+  return {
+    status: "disabled",
+    provider: "none",
+    model: null,
+    pending: 0,
+    failed: 0,
+    stale: 0,
+    candidateEdges: 0,
+    confirmedEdges: 0,
+    pendingSemanticEdgeBlocks: 0
+  };
+}
+
+function combineReliability(
+  contextReliability: Reliability,
+  embeddingIndex: DerivedIndexSnapshot,
+  extractorIndex: DerivedIndexSnapshot
+): Reliability {
+  if (contextReliability === "Low") {
+    return "Low";
+  }
+  if (embeddingIndex.status === "failed" || extractorIndex.status === "failed") {
+    return contextReliability === "High" ? "Medium" : contextReliability;
+  }
+  if (embeddingIndex.status === "stale" || extractorIndex.status === "stale") {
+    return contextReliability === "High" ? "Medium" : contextReliability;
+  }
+  return contextReliability;
 }

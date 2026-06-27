@@ -26,6 +26,9 @@ describe("status", () => {
       expect(initialFresh.status).toBe("Fresh");
       expect(initialFresh.contextIndex.status).toBe("Fresh");
       expect(initialFresh.embeddingIndex.status).toBe("disabled");
+      expect(initialFresh.embeddingIndex.candidateEdges).toBe(0);
+      expect(initialFresh.embeddingIndex.confirmedEdges).toBe(0);
+      expect(initialFresh.embeddingIndex.pendingSemanticEdgeBlocks).toBe(0);
       expect(initialFresh.extractorIndex.status).toBe("disabled");
       expect(initialFresh.overallReliability).toBe("High");
 

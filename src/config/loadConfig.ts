@@ -46,6 +46,17 @@ const configSchema = z.object({
       generatedAt: z.string()
     })
     .optional(),
+  embedding: z
+    .object({
+      enabled: z.boolean(),
+      provider: z.enum(["none", "ollama", "local-onnx", "openai-compatible-local-endpoint"]),
+      model: z.string().nullable(),
+      dimensions: z.number().int().positive().nullable(),
+      endpoint: z.string().optional(),
+      updatedAt: z.string().optional(),
+      lastError: z.string().nullable().optional()
+    })
+    .optional(),
   sources: z.array(z.string()).min(1),
   ignore: z.array(z.string()),
   privacy: z.object({

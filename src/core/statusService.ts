@@ -7,7 +7,9 @@ import { scanSources } from "../indexing/scanner.js";
 import { redactSecrets } from "../security/redaction.js";
 import { openDatabase } from "../storage/database.js";
 import { GraphRepository } from "../storage/repositories.js";
+import { migrate } from "../storage/schema.js";
 import type { StatusSnapshot } from "../types/domain.js";
+import { readEmbeddingIndexSnapshot } from "./embeddingService.js";
 import { buildStatusSnapshot } from "./statusSnapshot.js";
 import { readWatcherSnapshot } from "./watchState.js";
 
@@ -36,6 +38,7 @@ export async function getContextStatus(projectRoot: string): Promise<StatusSnaps
   const config = await loadConfig(projectRoot);
   const currentSourcePaths = await scanSources(projectRoot, config);
   const db = openDatabase(dbPath);
+  migrate(db);
   const repository = new GraphRepository(db);
   const counts = repository.counts();
   const indexedSources = readIndexedSources(db);
@@ -61,6 +64,7 @@ export async function getContextStatus(projectRoot: string): Promise<StatusSnaps
   const indexedHead = readStatusValue<string | null>(db, "indexedGitHead", null);
   const lastIndexedAt = readStatusValue<string | null>(db, "lastIndexedAt", null);
   const failedBlocks = readStatusValue<number>(db, "failedBlocks", 0);
+  const embeddingIndex = readEmbeddingIndexSnapshot(db, config);
   db.close();
 
   const headChanged = currentHead !== indexedHead;
@@ -82,6 +86,8 @@ export async function getContextStatus(projectRoot: string): Promise<StatusSnaps
     failedBlocks,
     conflicts: 0,
     warnings: isStale ? ["ContextGraph is not up to date. Run: contextgraph index"] : [],
+    embeddingIndex,
+    searchMode: embeddingIndex.status === "enabled" ? "hybrid" : "FTS + trigram",
     watcher: await readWatcherSnapshot(projectRoot)
   });
 }

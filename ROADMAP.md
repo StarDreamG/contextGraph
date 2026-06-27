@@ -52,7 +52,8 @@ Level 0 后续还要继续加固中文 trigram 片段检索、query 结果字段
    - `source-comments`：保留 preset 边界，注释抽取待做
    - `source`：保留显式边界，不默认启用
 5. **Embedding**
-   - 等 Level 0 和关联能力稳定后再接入
+   - 已具备首版可选 provider 配置、SQLite 缓存、增量 rebuild、状态面板、query graph expansion 和 candidate semantic edges
+   - 后续继续增强 hybrid scoring、provider 生态和大索引性能
 6. **LLM Extractor**
    - 最后接入，保持可选、本地、缓存、candidate 和 schema 校验
 
@@ -325,9 +326,22 @@ SourceComment 默认语义：
 
 ## Fifth Priority: Embedding Mode
 
-目标：等 Level 0、brief、经验关联源码和 preset 稳定后，再增加可选本地 embedding，让 ContextGraph 支持 semantic search、hybrid search 和 project experience blocks 之间的 candidate semantic edges。该阶段同时负责把文档规则、源码注释、OpenAPI 契约、测试脚本、handoff 和环境配置连接起来。
+目标：在 Level 0、brief、经验关联源码和 preset 稳定后，增加可选本地 embedding，让 ContextGraph 支持 semantic search、hybrid search 和 project experience blocks 之间的 candidate semantic edges。该阶段同时负责把文档规则、源码注释、OpenAPI 契约、测试脚本、handoff 和环境配置连接起来。
 
-命令规划：
+首版已实现：
+
+- `contextgraph embedding enable --provider <provider> --model <model> [--endpoint <url>]`
+- `contextgraph embedding disable`
+- `contextgraph embedding status`
+- `contextgraph embedding rebuild`
+- SQLite `embeddings` 表，按 `(block_id, provider, model)` 缓存。
+- `block_hash` 不变时跳过，不重复计算 embedding。
+- provider 失败时不影响 Level 0 FTS / trigram 查询。
+- `status` 显示 Embedding index freshness、pending embeds、candidate edge count、confirmed edge count 和 pending semantic edge blocks。
+- rebuild 后按相似度建立 `SEMANTICALLY_RELATED` candidate edge。
+- query 时不调用模型，只沿已有 candidate semantic edge 做 graph expansion。
+
+命令：
 
 ```bash
 contextgraph embedding enable --provider ollama --model bge-m3
@@ -343,7 +357,7 @@ Provider 预留：
 - `local-onnx`
 - `openai-compatible-local-endpoint`
 
-第一版先实现 provider 接口、配置、状态、schema 和 pending 统计；具体 provider 可以分批接入。
+第一版已实现 provider 接口、配置、状态、schema、pending 统计、OpenAI-compatible local endpoint 和 Ollama endpoint。`local-onnx` 仍为预留接口，不打包模型。
 
 核心要求：
 
@@ -355,7 +369,7 @@ Provider 预留：
 - npm 包不内置模型文件。
 - 索引后，对相似度超过阈值的 block 建立 candidate edge。
 - candidate edge 不等同 confirmed edge，必须带 score、provider、model、status。
-- 新增 candidate edge 类型：`SEMANTICALLY_RELATED`、`SAME_DOMAIN`、`MAY_APPLY_TO`、`POSSIBLY_CONFLICTS`、`POSSIBLY_REINFORCES`。
+- 新增 candidate edge 类型：`SEMANTICALLY_RELATED` 已落地；`SAME_DOMAIN`、`MAY_APPLY_TO`、`POSSIBLY_CONFLICTS`、`POSSIBLY_REINFORCES` 后续扩展。
 - confirmed edge 只能来自显式规则、用户确认、handoff 明确说明、测试验证或 LLM extractor 结构化判断。
 
 计划关联：

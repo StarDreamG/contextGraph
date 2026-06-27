@@ -5,6 +5,13 @@ export const DEFAULT_CONFIG: ContextGraphConfig = {
   version: 1,
   projectName: "",
   presets: ["project"],
+  embedding: {
+    enabled: false,
+    provider: "none",
+    model: null,
+    dimensions: null,
+    lastError: null
+  },
   sources: resolvePresetSources(["project"]),
   ignore: [
     ".env",

@@ -18,6 +18,7 @@ export type Priority = "P0" | "P1" | "P2" | "P3" | "P4";
 export type DerivedIndexStatus = "disabled" | "enabled" | "stale" | "failed";
 export type WatcherStatus = "stopped" | "watching" | "failed";
 export type SourcePreset = "basic" | "project" | "api" | "source-comments" | "source";
+export type EmbeddingProviderName = "none" | "ollama" | "local-onnx" | "openai-compatible-local-endpoint";
 
 export interface PrivacyConfig {
   offline: true;
@@ -30,9 +31,20 @@ export interface ContextGraphConfig {
   projectName: string;
   presets?: SourcePreset[];
   detectedProject?: ProjectDetectionSnapshot;
+  embedding?: EmbeddingConfig;
   sources: string[];
   ignore: string[];
   privacy: PrivacyConfig;
+}
+
+export interface EmbeddingConfig {
+  enabled: boolean;
+  provider: EmbeddingProviderName;
+  model: string | null;
+  dimensions: number | null;
+  endpoint?: string;
+  updatedAt?: string;
+  lastError?: string | null;
 }
 
 export interface ProjectDetectionSnapshot {
@@ -148,6 +160,9 @@ export interface DerivedIndexSnapshot {
   pending: number;
   failed: number;
   stale: number;
+  candidateEdges: number;
+  confirmedEdges: number;
+  pendingSemanticEdgeBlocks: number;
 }
 
 export interface WatcherSnapshot {

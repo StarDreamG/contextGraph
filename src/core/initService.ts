@@ -47,11 +47,12 @@ async function createInitialConfig(projectRoot: string, options: InitOptions): P
   const packageName = await readPackageName(projectRoot);
   const projectName = packageName ?? path.basename(projectRoot);
   if (options.preset && options.preset !== "auto") {
+    const sources = resolvePresetSources([options.preset]);
     return {
       ...DEFAULT_CONFIG,
       projectName,
       presets: [options.preset],
-      sources: resolvePresetSources([options.preset])
+      sources: sources.length > 0 ? sources : resolvePresetSources(["basic"])
     };
   }
 

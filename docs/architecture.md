@@ -217,12 +217,21 @@ Query results must clearly show that a hit came from a source comment. Agents mu
 
 ## Embedding And Semantic Edges
 
-Embedding is planned as an optional `v0.3.x` layer. It is not a default dependency and must not be required for Level 0.
+Embedding is an optional layer. It is not a default dependency and must not be required for Level 0.
 
 Embedding has two roles:
 
 - semantic search for query recall
 - candidate semantic edge discovery between project experience blocks
+
+Current first slice:
+
+- `contextgraph embedding enable|disable|status|rebuild`
+- local SQLite `embeddings` cache
+- provider/model/block-hash scoped cache keys
+- incremental rebuild for new or changed blocks
+- candidate `SEMANTICALLY_RELATED` edges
+- query-time graph expansion over existing candidate edges without model calls
 
 Planned embedding associations:
 
@@ -233,7 +242,7 @@ Planned embedding associations:
 
 Candidate semantic edge types:
 
-- `SEMANTICALLY_RELATED`
+- `SEMANTICALLY_RELATED` (first slice implemented)
 - `MAY_APPLY_TO`
 - `POSSIBLY_REINFORCES`
 - `POSSIBLY_CONFLICTS`

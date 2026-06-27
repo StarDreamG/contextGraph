@@ -4,6 +4,7 @@ import { assessPriority, priorityRank } from "../indexing/priority.js";
 import { buildQueryPlan, type QueryPlan } from "../query/queryPlanner.js";
 import { openDatabase } from "../storage/database.js";
 import type { Priority, QueryResult, StatusSnapshot } from "../types/domain.js";
+import { semanticCandidateRelations } from "./embeddingService.js";
 
 export interface ContextQueryResponse {
   query: string;
@@ -25,6 +26,7 @@ interface QueryRow {
   type: QueryResult["type"];
   title: string;
   content: string;
+  blockId: string | null;
   sourcePath: string | null;
   startLine: number | null;
   endLine: number | null;
@@ -48,6 +50,12 @@ export async function queryContext(projectRoot: string, query: string, options: 
   const db = openDatabase(path.join(projectRoot, ".contextgraph", "graph.db"));
   const directRows = runQueryForText(db, queryPlan.normalizedQuery, queryPlan.normalizedQuery, false);
   const rows = collectRows(db, queryPlan, directRows);
+  for (const row of collectGraphExpansionRows(db, rows)) {
+    const key = rowKey(row);
+    if (!rows.some((existing) => rowKey(existing) === key)) {
+      rows.push(row);
+    }
+  }
   db.close();
 
   const results = rows
@@ -79,6 +87,59 @@ export async function queryContext(projectRoot: string, query: string, options: 
           ]
         : []
   };
+}
+
+function collectGraphExpansionRows(db: ReturnType<typeof openDatabase>, seedRows: QueryRow[]): QueryRow[] {
+  if (seedRows.length === 0) {
+    return [];
+  }
+  const ids = readSeedNodeIds(db, seedRows).slice(0, 50);
+  if (ids.length === 0) {
+    return [];
+  }
+  const idPlaceholders = ids.map(() => "?").join(", ");
+  const relations = semanticCandidateRelations();
+  const relationPlaceholders = relations.map(() => "?").join(", ");
+  const sql = `
+SELECT
+  nodes.id AS id,
+  nodes.type AS type,
+  nodes.title AS title,
+  nodes.content AS content,
+  nodes.block_id AS blockId,
+  blocks.path AS sourcePath,
+  blocks.start_line AS startLine,
+  blocks.end_line AS endLine,
+  nodes.confidence AS confidence,
+  nodes.status AS status,
+  nodes.metadata AS metadata,
+  10 AS rank,
+  'graph-expansion' AS matchedQuery,
+  1 AS matchedByExpandedQuery
+FROM edges
+JOIN nodes ON nodes.id = CASE
+  WHEN edges.from_node IN (${idPlaceholders}) THEN edges.to_node
+  ELSE edges.from_node
+END
+LEFT JOIN blocks ON blocks.id = nodes.block_id
+WHERE edges.relation IN (${relationPlaceholders})
+  AND (edges.from_node IN (${idPlaceholders}) OR edges.to_node IN (${idPlaceholders}))
+LIMIT 50`;
+  return db.prepare(sql).all(...ids, ...relations, ...ids, ...ids) as QueryRow[];
+}
+
+function readSeedNodeIds(db: ReturnType<typeof openDatabase>, seedRows: QueryRow[]): string[] {
+  const directIds = seedRows.map((row) => row.id);
+  const blockIds = [...new Set(seedRows.map((row) => row.blockId).filter((value): value is string => Boolean(value)))];
+  if (blockIds.length === 0) {
+    return [...new Set(directIds)];
+  }
+
+  const placeholders = blockIds.map(() => "?").join(", ");
+  const blockNodeRows = db
+    .prepare(`SELECT id FROM nodes WHERE block_id IN (${placeholders})`)
+    .all(...blockIds) as Array<{ id: string }>;
+  return [...new Set([...directIds, ...blockNodeRows.map((row) => row.id)])];
 }
 
 function scopedQueryText(query: string, options: QueryOptions): string {
@@ -146,6 +207,7 @@ SELECT
   nodes.type AS type,
   nodes.title AS title,
   nodes.content AS content,
+  nodes.block_id AS blockId,
   blocks.path AS sourcePath,
   blocks.start_line AS startLine,
   blocks.end_line AS endLine,
@@ -187,6 +249,7 @@ SELECT
   nodes.type AS type,
   nodes.title AS title,
   nodes.content AS content,
+  nodes.block_id AS blockId,
   blocks.path AS sourcePath,
   blocks.start_line AS startLine,
   blocks.end_line AS endLine,

@@ -11,6 +11,11 @@ export function registerStatusCommand(program: Command): void {
     console.log(`Reliability:    ${status.reliability}`);
     console.log(`Context index:  ${status.contextIndex.status}`);
     console.log(`Embedding index:${formatDerivedStatus(status.embeddingIndex.status)}`);
+    console.log(`Embedding model:${formatDerivedModel(status.embeddingIndex.provider, status.embeddingIndex.model)}`);
+    console.log(`Pending embeds: ${status.embeddingIndex.pending}`);
+    console.log(`Candidate edges:${status.embeddingIndex.candidateEdges}`);
+    console.log(`Confirmed edges: ${status.embeddingIndex.confirmedEdges}`);
+    console.log(`Pending semantic edge blocks: ${status.embeddingIndex.pendingSemanticEdgeBlocks}`);
     console.log(`Extractor index:${formatDerivedStatus(status.extractorIndex.status)}`);
     console.log(`Search mode:    ${status.searchMode}`);
     console.log(`Overall reliability: ${status.overallReliability}`);
@@ -38,4 +43,8 @@ export function registerStatusCommand(program: Command): void {
 
 function formatDerivedStatus(status: string): string {
   return status.padStart(9, " ");
+}
+
+function formatDerivedModel(provider: string, model: string | null): string {
+  return model ? ` ${provider}/${model}` : ` ${provider}`;
 }

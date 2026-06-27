@@ -18,6 +18,7 @@ import { openDatabase } from "../storage/database.js";
 import { GraphRepository } from "../storage/repositories.js";
 import { migrate } from "../storage/schema.js";
 import type { BlockRecord, ContextGraphConfig, NodeRecord, SourcePreset, SourceRecord, StatusSnapshot } from "../types/domain.js";
+import { readEmbeddingIndexSnapshot } from "./embeddingService.js";
 import { buildStatusSnapshot } from "./statusSnapshot.js";
 
 const CURRENT_INDEX_VERSION = 2;
@@ -115,6 +116,7 @@ export async function indexContextGraph(projectRoot: string, options: IndexOptio
   });
 
   const counts = repository.counts();
+  const embeddingIndex = readEmbeddingIndexSnapshot(db, config);
   const snapshot: StatusSnapshot = buildStatusSnapshot({
     indexVersion: CURRENT_INDEX_VERSION,
     status: "Fresh",
@@ -130,7 +132,9 @@ export async function indexContextGraph(projectRoot: string, options: IndexOptio
     pendingBlocks: 0,
     failedBlocks: 0,
     conflicts: 0,
-    warnings: []
+    warnings: [],
+    embeddingIndex,
+    searchMode: embeddingIndex.status === "enabled" ? "hybrid" : "FTS + trigram"
   });
   repository.setStatus(snapshot);
   db.close();

@@ -84,6 +84,14 @@ describe("CLI e2e", () => {
       const watchHelp = await execFileAsync("node", [cli, "watch", "--help"], { cwd: project.root });
       expect(watchHelp.stdout).toContain("--debounce <ms>");
 
+      const embeddingHelp = await execFileAsync("node", [cli, "embedding", "--help"], { cwd: project.root });
+      expect(embeddingHelp.stdout).toContain("enable");
+      expect(embeddingHelp.stdout).toContain("rebuild");
+
+      const embeddingStatus = await execFileAsync("node", [cli, "embedding", "status"], { cwd: project.root });
+      expect(embeddingStatus.stdout).toContain("ContextGraph Embedding Status");
+      expect(embeddingStatus.stdout).toContain("Status:          disabled");
+
       const query = await execFileAsync("node", [cli, "query", "测试"], { cwd: project.root });
       expect(query.stdout).toContain("Relevant Context:");
 

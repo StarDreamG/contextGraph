@@ -92,6 +92,9 @@ contextgraph doctor
 contextgraph brief
 contextgraph query "测试"
 contextgraph explain-query "智策星隔离要求，不能占用哪些端口和资源"
+contextgraph embedding status
+contextgraph embedding enable --provider openai-compatible-local-endpoint --model bge-m3 --endpoint http://127.0.0.1:11434/v1/embeddings
+contextgraph embedding rebuild
 contextgraph handoff --agent codex --task "实现功能" --summary "完成实现，已运行 npm test" --files "src/example.ts"
 ```
 
@@ -115,6 +118,7 @@ npm run contextgraph -- status
 - `brief`：为新 Agent 输出最高优先级的开工摘要。
 - `query`：搜索相关项目上下文。
 - `explain-query`：展示自然语言查询的 normalize、intent、entities 和 expanded queries。
+- `embedding enable|disable|status|rebuild`：管理可选本地 embedding 缓存和候选语义边。
 - `handoff`：记录 Agent 会话交接摘要。
 - `mcp`：启动本地 stdio MCP Server，可通过 `--project <path>` 指定项目根目录。
 
@@ -135,6 +139,7 @@ npm run contextgraph -- status
 - `RELATED_TO_FILE`：经验节点关联到文档中提到的源码、配置或测试文件。
 - `APPLIES_TO`：规则、风险或经验适用于某个文件或模块。
 - `REQUIRES_TEST`：相关文件或模块变更后应运行的测试。
+- `SEMANTICALLY_RELATED`：由 embedding rebuild 发现的候选语义关系，默认 `status=candidate`，不是 confirmed 规则。
 
 查询结果会优先返回高优先级节点，并显示 `Priority` 和原因。
 
@@ -188,6 +193,32 @@ ContextGraph 已开始支持“经验关联源码路径”，但仍不把自己�
 - `stale`：来源已过期、Git HEAD 不一致或长时间未验证。
 
 后续会增加 `supersedes` 关系，用于标记新文档、新 handoff 或新规则替代旧文档。
+
+## Optional Embedding
+
+Embedding 是可选能力，默认关闭，不作为 npm 包的硬依赖，也不会内置模型。启用后，ContextGraph 只在 `embedding rebuild` 阶段调用显式配置的 provider，并把结果缓存到本地 SQLite：
+
+```bash
+contextgraph embedding enable --provider openai-compatible-local-endpoint --model bge-m3 --endpoint http://127.0.0.1:11434/v1/embeddings
+contextgraph embedding rebuild
+contextgraph embedding status
+```
+
+当前 provider 边界：
+
+- `none`：默认关闭。
+- `openai-compatible-local-endpoint`：调用用户显式配置的本地兼容 endpoint。
+- `ollama`：调用本机 Ollama embedding endpoint。
+- `local-onnx`：预留接口，当前不打包模型。
+
+Embedding 结果与 `block_hash` 绑定。block 未变化时，`embedding rebuild` 会跳过，不重复计算。provider 不可用时，基础 `query` 仍会回退到 FTS / 中文片段检索。
+
+`query` 不会现场调用模型。它只读取已经缓存的 embedding 结果和候选语义边，在 FTS / trigram 命中后沿 `SEMANTICALLY_RELATED` 等 candidate edges 扩展上下文。
+
+FTS finds text.
+Embedding connects experience blocks.
+Graph expansion gives agents the full project context.
+Status tells whether the context is trustworthy.
 
 ## Optional Sources: API Contracts And Source Comments
 
@@ -326,7 +357,7 @@ ContextGraph 默认 local-first：
 2. `Brief Productization`：把 `contextgraph brief` 做成新 Agent 开工入口，支持 `--task`、`--file`、`--domain`，输出 P0 铁律、source of truth、必跑测试、环境警告、最近 handoff、过期/冲突信息和常见失败。
 3. `Experience-to-Source Association`：不解析 AST，只从文档/handoff/测试中抽文件路径、模块名和测试命令，建立 `RELATED_TO_FILE`、`APPLIES_TO`、`REQUIRES_TEST`，支持 `query --file` / `query --module`。
 4. `Project Detector + Presets`：增加 `basic`、`project`、`api`、`source-comments`、`source`，让默认范围安全但不贫血，大范围 source 必须显式确认。
-5. `Embedding`：可选本地 embedding、hybrid search、semantic edge discovery 和 embedding status。
+5. `Embedding`：已具备首版可选本地 embedding、缓存、candidate semantic edge discovery、query graph expansion 和 embedding status；后续增强 hybrid scoring 和 provider 生态。
 6. `Local LLM Extractor`：可选本地 LLM 结构化抽取 Rule / Failure / Fix / Decision / TestRequirement / Risk / EnvironmentFact，支持 candidate -> confirmed 工作流。
 
 - `Level 0 基础模式`：Markdown / JSON / Text parser、SQLite、FTS5、中文片段检索、status、query、MCP、handoff。未启用任何模型能力时，这一层必须独立可用。
