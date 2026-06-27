@@ -44,7 +44,7 @@ export async function queryContext(projectRoot: string, query: string): Promise<
   db.close();
 
   const results = rows
-    .map(toQueryResult)
+    .map((row) => toQueryResult(row, status.status))
     .sort((left, right) => resultScore(right, queryPlan) - resultScore(left, queryPlan))
     .slice(0, 10);
 
@@ -217,21 +217,32 @@ function quoteTerms(query: string): string {
   return `"${query.replaceAll('"', '""')}"`;
 }
 
-function toQueryResult(row: QueryRow): QueryResult {
+function toQueryResult(row: QueryRow, freshness: QueryResult["freshness"]): QueryResult {
   const metadata = parseMetadata(row.metadata);
   const fallbackPriority = assessPriority(row.type, row.title, row.content);
   const priority = readPriority(metadata.priority) ?? fallbackPriority.priority;
+  const lineRange =
+    typeof row.startLine === "number" && typeof row.endLine === "number"
+      ? { start: row.startLine, end: row.endLine }
+      : null;
   return {
     type: row.type,
     title: row.title,
     content: excerpt(row.content),
     priority,
     priorityReason: typeof metadata.priorityReason === "string" ? metadata.priorityReason : fallbackPriority.reason,
+    source: {
+      type: row.sourcePath ? "indexed_source" : "unknown",
+      path: row.sourcePath,
+      lineRange
+    },
     sourcePath: row.sourcePath,
     startLine: row.startLine,
     endLine: row.endLine,
+    lineRange,
     confidence: row.confidence,
     status: row.status,
+    freshness,
     rank: row.rank,
     matchedQuery: row.matchedQuery,
     matchedByExpandedQuery: Boolean(row.matchedByExpandedQuery)
@@ -264,7 +275,7 @@ function resultScore(result: QueryResult, queryPlan: QueryPlan): number {
 }
 
 function rowPreference(row: QueryRow, queryPlan: QueryPlan): number {
-  return resultScore(toQueryResult(row), queryPlan);
+  return resultScore(toQueryResult(row, "Fresh"), queryPlan);
 }
 
 function entityMatchCount(text: string, queryPlan: QueryPlan): number {

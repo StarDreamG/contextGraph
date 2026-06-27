@@ -19,6 +19,19 @@ describe("query", () => {
       expect(result.status.status).toBe("Fresh");
       expect(result.results.length).toBeGreaterThan(0);
       expect(result.results[0]?.sourcePath).toBe("AGENTS.md");
+      expect(result.results[0]).toMatchObject({
+        source: {
+          path: "AGENTS.md",
+          type: "indexed_source"
+        },
+        lineRange: {
+          start: expect.any(Number),
+          end: expect.any(Number)
+        },
+        freshness: "Fresh",
+        matchedQuery: expect.any(String),
+        matchedByExpandedQuery: expect.any(Boolean)
+      });
 
       const multiTerm = await queryContext(project.root, "导出 测试");
       expect(multiTerm.results.length).toBeGreaterThan(0);

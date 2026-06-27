@@ -86,14 +86,27 @@ export interface QueryResult {
   content: string;
   priority: Priority;
   priorityReason: string;
+  source: {
+    type: "indexed_source" | "unknown";
+    path: string | null;
+    lineRange: {
+      start: number;
+      end: number;
+    } | null;
+  };
   sourcePath: string | null;
   startLine: number | null;
   endLine: number | null;
+  lineRange: {
+    start: number;
+    end: number;
+  } | null;
   confidence: number;
   status: string;
+  freshness: GraphStatus;
   rank: number;
-  matchedQuery?: string;
-  matchedByExpandedQuery?: boolean;
+  matchedQuery: string;
+  matchedByExpandedQuery: boolean;
 }
 
 export interface ContextIndexSnapshot {
