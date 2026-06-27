@@ -4,6 +4,9 @@ import { getBrief, type BriefItem, type BriefSection } from "../core/briefServic
 
 interface BriefOptions {
   project?: string;
+  task?: string;
+  file?: string;
+  domain?: string;
 }
 
 export function registerBriefCommand(program: Command): void {
@@ -11,20 +14,34 @@ export function registerBriefCommand(program: Command): void {
     .command("brief")
     .description("Show the highest-priority context for a new agent")
     .option("-p, --project <path>", "Project root to summarize", process.cwd())
+    .option("--task <task>", "Task-aware brief scope")
+    .option("--file <path>", "File-aware brief scope")
+    .option("--domain <domain>", "Domain-aware brief scope")
     .action(async (options: BriefOptions) => {
-      const brief = await getBrief(path.resolve(options.project ?? process.cwd()));
+      const brief = await getBrief(path.resolve(options.project ?? process.cwd()), {
+        task: options.task,
+        file: options.file,
+        domain: options.domain
+      });
       console.log("ContextGraph Brief");
       console.log("────────────────────────────────");
       console.log(`Project:     ${brief.projectRoot}`);
+      if (brief.request.task) console.log(`Task:       ${brief.request.task}`);
+      if (brief.request.file) console.log(`File:       ${brief.request.file}`);
+      if (brief.request.domain) console.log(`Domain:     ${brief.request.domain}`);
       console.log(`Status:      ${brief.status.status}`);
       console.log(`Reliability: ${brief.status.reliability}`);
       for (const warning of brief.warnings) {
         console.log(`Warning: ${warning}`);
       }
-      printSection(brief.sections.mustKnow);
-      printSection(brief.sections.requiredWorkflow);
-      printSection(brief.sections.knownPitfalls);
-      printSection(brief.sections.projectShape);
+      printSection(brief.sections.p0Rules);
+      printSection(brief.sections.currentSourceOfTruth);
+      printSection(brief.sections.requiredTests);
+      printSection(brief.sections.environmentWarnings);
+      printSection(brief.sections.recentHandoff);
+      printSection(brief.sections.deprecatedContext);
+      printSection(brief.sections.knownFailureModes);
+      printSection(brief.sections.relatedFiles);
       console.log(brief.sections.toolProfile.title);
       console.log(`- ${brief.sections.toolProfile.message}`);
     });

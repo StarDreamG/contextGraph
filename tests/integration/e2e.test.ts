@@ -89,8 +89,15 @@ describe("CLI e2e", () => {
 
       const brief = await execFileAsync("node", [cli, "brief"], { cwd: project.root });
       expect(brief.stdout).toContain("ContextGraph Brief");
-      expect(brief.stdout).toContain("P1 Required Workflow");
+      expect(brief.stdout).toContain("P0 Rules");
+      expect(brief.stdout).toContain("Required Tests");
       expect(brief.stdout).toContain("Tool Profile");
+
+      const taskBrief = await execFileAsync("node", [cli, "brief", "--task", "测试", "--file", "AGENTS.md"], {
+        cwd: project.root
+      });
+      expect(taskBrief.stdout).toContain("Task:       测试");
+      expect(taskBrief.stdout).toContain("File:       AGENTS.md");
 
       const handoff = await execFileAsync(
         "node",
