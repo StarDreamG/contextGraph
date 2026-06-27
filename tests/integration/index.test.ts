@@ -94,4 +94,58 @@ describe("index", () => {
       await project.cleanup();
     }
   });
+
+  it("can index API contract sources through the api preset without enabling source indexing", async () => {
+    const project = await createTempProject();
+    try {
+      await mkdir(path.join(project.root, ".contextgraph"), { recursive: true });
+      await writeFile(
+        path.join(project.root, ".contextgraph", "config.json"),
+        JSON.stringify(
+          {
+            version: 1,
+            projectName: "api-demo",
+            presets: ["basic"],
+            sources: ["AGENTS.md"],
+            ignore: [],
+            privacy: {
+              offline: true,
+              allowRemoteLLM: false,
+              redactSecrets: true
+            }
+          },
+          null,
+          2
+        )
+      );
+      await writeFile(path.join(project.root, "AGENTS.md"), "## API\n接口契约以 OpenAPI 为准。\n");
+      await writeFile(
+        path.join(project.root, "openapi.json"),
+        JSON.stringify({
+          openapi: "3.0.0",
+          paths: {
+            "/blockchain/upload": {
+              post: {
+                summary: "Upload blockchain attachment",
+                deprecated: false
+              }
+            }
+          }
+        })
+      );
+      await writeFile(path.join(project.root, "src.ts"), "export const implementation = true;\n");
+
+      const result = await indexContextGraph(project.root, { preset: "api" });
+
+      expect(result.presetsUsed).toEqual(expect.arrayContaining(["basic", "api"]));
+
+      const db = new Database(path.join(project.root, ".contextgraph", "graph.db"));
+      const sources = db.prepare("SELECT path FROM sources ORDER BY path").all() as Array<{ path: string }>;
+      expect(sources.map((source) => source.path)).toContain("openapi.json");
+      expect(sources.map((source) => source.path)).not.toContain("src.ts");
+      db.close();
+    } finally {
+      await project.cleanup();
+    }
+  });
 });

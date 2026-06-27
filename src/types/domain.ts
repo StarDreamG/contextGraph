@@ -17,6 +17,7 @@ export type Reliability = "High" | "Medium" | "Low";
 export type Priority = "P0" | "P1" | "P2" | "P3" | "P4";
 export type DerivedIndexStatus = "disabled" | "enabled" | "stale" | "failed";
 export type WatcherStatus = "stopped" | "watching" | "failed";
+export type SourcePreset = "basic" | "project" | "api" | "source-comments" | "source";
 
 export interface PrivacyConfig {
   offline: true;
@@ -27,9 +28,21 @@ export interface PrivacyConfig {
 export interface ContextGraphConfig {
   version: 1;
   projectName: string;
+  presets?: SourcePreset[];
+  detectedProject?: ProjectDetectionSnapshot;
   sources: string[];
   ignore: string[];
   privacy: PrivacyConfig;
+}
+
+export interface ProjectDetectionSnapshot {
+  presets: SourcePreset[];
+  languages: string[];
+  frameworks: string[];
+  packageManagers: string[];
+  apiContracts: string[];
+  deployment: string[];
+  generatedAt: string;
 }
 
 export interface SourceRecord {

@@ -83,7 +83,9 @@ npm link
 
 ```bash
 contextgraph init
+contextgraph init --preset auto
 contextgraph index
+contextgraph index --preset api
 contextgraph status
 contextgraph watch --debounce 500
 contextgraph doctor
@@ -104,7 +106,9 @@ npm run contextgraph -- status
 ## 命令
 
 - `init`：创建 `.contextgraph`、`graph.db`、配置、状态文件和 AGENTS.md 指引。
+- `init --preset auto|basic|project|api`：初始化时根据项目标志文件选择安全的经验来源预设。
 - `index`：扫描配置的 sources，脱敏内容，生成 blocks、nodes、FTS 和状态。
+- `index --preset api`：在当前配置之外额外纳入 OpenAPI / Swagger 契约来源。
 - `status`：显示新鲜度和可信度。
 - `watch`：监听本地已配置 sources，文件变化后自动 debounce 重建索引。
 - `doctor`：检查 Node、SQLite 原生依赖、项目初始化状态和索引健康度。
@@ -128,6 +132,9 @@ npm run contextgraph -- status
 
 - `co_occurs_with`：同一上下文 block 内共同出现。
 - `fixed_by`：失败经验指向修复方案。
+- `RELATED_TO_FILE`：经验节点关联到文档中提到的源码、配置或测试文件。
+- `APPLIES_TO`：规则、风险或经验适用于某个文件或模块。
+- `REQUIRES_TEST`：相关文件或模块变更后应运行的测试。
 
 查询结果会优先返回高优先级节点，并显示 `Priority` 和原因。
 
@@ -152,7 +159,7 @@ Matched by expanded query: 智策星 端口
 
 如果所有查询都无结果，返回 query plan 和建议，而不是静默空结果。
 
-后续会补强“经验关联源码”的能力，但仍不把 ContextGraph 做成源码解析器。目标是从文档、handoff 和 session summary 中抽取文件路径、模块名和测试命令，建立：
+ContextGraph 已开始支持“经验关联源码路径”，但仍不把自己做成源码解析器。它从文档、handoff 和 session summary 中抽取文件路径、模块名和测试命令，建立：
 
 - `RELATED_TO_FILE`：经验节点关联到源码文件或配置文件。
 - `APPLIES_TO`：规则或风险适用于某个模块、目录或文件。
@@ -193,7 +200,7 @@ Source comments and OpenAPI belong to ContextGraph only when they express projec
 
 ### Swagger / OpenAPI
 
-`v0.2.x` 规划增加 `api` preset：
+`v0.2.x` 已有首版 `api` preset，可把 OpenAPI / Swagger 文件纳入扫描来源：
 
 ```bash
 contextgraph index --preset api
@@ -208,7 +215,7 @@ contextgraph index --preset api
 - `docs/**/openapi*.json`
 - `docs/**/swagger*.yaml`
 
-OpenAPI / Swagger 是接口契约，适合纳入项目经验图谱。解析器将提取 endpoint、method、path、request params、request body、response schema、tags 和 deprecated 状态，并生成：
+OpenAPI / Swagger 是接口契约，适合纳入项目经验图谱。当前版本先把这些契约文件作为高价值来源纳入索引；后续解析器将提取 endpoint、method、path、request params、request body、response schema、tags 和 deprecated 状态，并生成：
 
 - `ApiEndpoint`
 - `ApiSchema`

@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { loadConfig } from "../config/loadConfig.js";
+import { mergePresetSources } from "../config/presets.js";
 import { currentGitHead } from "../git/gitState.js";
 import { classifyBlock } from "../indexing/classifier.js";
 import { extractExperienceFacts } from "../indexing/experience.js";
@@ -16,12 +17,13 @@ import { redactSecrets } from "../security/redaction.js";
 import { openDatabase } from "../storage/database.js";
 import { GraphRepository } from "../storage/repositories.js";
 import { migrate } from "../storage/schema.js";
-import type { BlockRecord, NodeRecord, SourceRecord, StatusSnapshot } from "../types/domain.js";
+import type { BlockRecord, ContextGraphConfig, NodeRecord, SourcePreset, SourceRecord, StatusSnapshot } from "../types/domain.js";
 import { buildStatusSnapshot } from "./statusSnapshot.js";
 
 const CURRENT_INDEX_VERSION = 2;
 
 export interface IndexResult {
+  presetsUsed: SourcePreset[];
   sourcesScanned: number;
   sourcesChanged: number;
   blocksIndexed: number;
@@ -34,14 +36,18 @@ export interface IndexResult {
   status: "Fresh" | "Stale";
 }
 
+export interface IndexOptions {
+  preset?: SourcePreset;
+}
+
 interface ExistingSource {
   id: string;
   path: string;
   hash: string;
 }
 
-export async function indexContextGraph(projectRoot: string): Promise<IndexResult> {
-  const config = await loadConfig(projectRoot);
+export async function indexContextGraph(projectRoot: string, options: IndexOptions = {}): Promise<IndexResult> {
+  const config = withIndexPreset(await loadConfig(projectRoot), options);
   const sourcePaths = await scanSources(projectRoot, config);
   const currentHead = await currentGitHead(projectRoot);
   const lastIndexedAt = new Date().toISOString();
@@ -131,6 +137,7 @@ export async function indexContextGraph(projectRoot: string): Promise<IndexResul
   await writeFile(path.join(projectRoot, ".contextgraph", "status.json"), `${JSON.stringify(snapshot, null, 2)}\n`);
 
   return {
+    presetsUsed: config.presets ?? [],
     sourcesScanned: sourcePaths.length,
     sourcesChanged,
     blocksIndexed,
@@ -141,6 +148,20 @@ export async function indexContextGraph(projectRoot: string): Promise<IndexResul
     indexedHead: currentHead,
     lastIndexedAt,
     status: "Fresh"
+  };
+}
+
+function withIndexPreset(config: ContextGraphConfig, options: IndexOptions): ContextGraphConfig {
+  if (!options.preset) {
+    return config;
+  }
+  const presets = [...(config.presets ?? []), options.preset].filter(
+    (preset, index, values) => values.indexOf(preset) === index
+  );
+  return {
+    ...config,
+    presets,
+    sources: mergePresetSources(config.sources, [options.preset])
   };
 }
 

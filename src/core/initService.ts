@@ -5,22 +5,30 @@ import {
   CONTEXTGRAPH_AGENT_SECTION_START,
   DEFAULT_CONFIG
 } from "../config/defaults.js";
+import { detectProjectPresets, readPackageName, resolvePresetSources } from "../config/presets.js";
 import { openDatabase } from "../storage/database.js";
 import { migrate } from "../storage/schema.js";
+import type { ContextGraphConfig, SourcePreset } from "../types/domain.js";
 
 export interface InitResult {
   projectRoot: string;
   createdGraphDir: string;
+  presets: SourcePreset[];
 }
 
-export async function initContextGraph(projectRoot: string): Promise<InitResult> {
+export interface InitOptions {
+  preset?: SourcePreset | "auto";
+}
+
+export async function initContextGraph(projectRoot: string, options: InitOptions = {}): Promise<InitResult> {
   const graphDir = path.join(projectRoot, ".contextgraph");
+  const initialConfig = await createInitialConfig(projectRoot, options);
 
   await mkdir(path.join(graphDir, "sessions"), { recursive: true });
   await mkdir(path.join(graphDir, "logs"), { recursive: true });
   await mkdir(path.join(graphDir, "snapshots"), { recursive: true });
 
-  await writeFileIfMissing(path.join(graphDir, "config.json"), JSON.stringify(DEFAULT_CONFIG, null, 2));
+  await writeFileIfMissing(path.join(graphDir, "config.json"), JSON.stringify(initialConfig, null, 2));
   await writeFileIfMissing(
     path.join(graphDir, "status.json"),
     JSON.stringify({ status: "Stale", reliability: "Low", lastIndexedAt: null }, null, 2)
@@ -32,7 +40,29 @@ export async function initContextGraph(projectRoot: string): Promise<InitResult>
 
   await ensureAgentsSection(path.join(projectRoot, "AGENTS.md"));
 
-  return { projectRoot, createdGraphDir: graphDir };
+  return { projectRoot, createdGraphDir: graphDir, presets: initialConfig.presets ?? [] };
+}
+
+async function createInitialConfig(projectRoot: string, options: InitOptions): Promise<ContextGraphConfig> {
+  const packageName = await readPackageName(projectRoot);
+  const projectName = packageName ?? path.basename(projectRoot);
+  if (options.preset && options.preset !== "auto") {
+    return {
+      ...DEFAULT_CONFIG,
+      projectName,
+      presets: [options.preset],
+      sources: resolvePresetSources([options.preset])
+    };
+  }
+
+  const detected = await detectProjectPresets(projectRoot);
+  return {
+    ...DEFAULT_CONFIG,
+    projectName,
+    presets: detected.presets,
+    detectedProject: detected,
+    sources: resolvePresetSources(detected.presets)
+  };
 }
 
 async function writeFileIfMissing(filePath: string, content: string): Promise<void> {

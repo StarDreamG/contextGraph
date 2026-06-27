@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
 import { DEFAULT_CONFIG } from "./defaults.js";
+import { PRESET_NAMES } from "./presets.js";
 import type { ContextGraphConfig } from "../types/domain.js";
 
 const LEGACY_DEFAULT_SOURCES = [
@@ -33,6 +34,18 @@ const LEGACY_DEFAULT_IGNORE = [
 const configSchema = z.object({
   version: z.literal(1),
   projectName: z.string(),
+  presets: z.array(z.enum(PRESET_NAMES)).optional(),
+  detectedProject: z
+    .object({
+      presets: z.array(z.enum(PRESET_NAMES)),
+      languages: z.array(z.string()),
+      frameworks: z.array(z.string()),
+      packageManagers: z.array(z.string()),
+      apiContracts: z.array(z.string()),
+      deployment: z.array(z.string()),
+      generatedAt: z.string()
+    })
+    .optional(),
   sources: z.array(z.string()).min(1),
   ignore: z.array(z.string()),
   privacy: z.object({

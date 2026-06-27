@@ -3,6 +3,8 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { CONTEXTGRAPH_AGENT_SECTION, DEFAULT_CONFIG } from "../../src/config/defaults.js";
 import { loadConfig } from "../../src/config/loadConfig.js";
+import { detectProjectPresets, resolvePresetSources } from "../../src/config/presets.js";
+import { initContextGraph } from "../../src/core/initService.js";
 import { createTempProject } from "../helpers/project.js";
 
 const legacyDefaultConfig = {
@@ -91,6 +93,41 @@ describe("default config", () => {
       const config = await loadConfig(project.root);
 
       expect(config.sources).toEqual(["custom/**/*.md"]);
+    } finally {
+      await project.cleanup();
+    }
+  });
+
+  it("resolves project and api presets without turning ContextGraph into a source graph", () => {
+    const projectSources = resolvePresetSources(["project"]);
+    const apiSources = resolvePresetSources(["api"]);
+
+    expect(projectSources).toContain("**/package.json");
+    expect(projectSources).toContain("**/Dockerfile");
+    expect(projectSources).toContain("**/docker-compose*.yml");
+    expect(projectSources).toContain("**/openapi.yaml");
+    expect(apiSources).toContain("docs/**/openapi*.json");
+    expect(projectSources).not.toContain("**/*.ts");
+    expect(projectSources).not.toContain("**/*.js");
+  });
+
+  it("detects project presets from local files during init", async () => {
+    const project = await createTempProject();
+    try {
+      await writeFile(path.join(project.root, "package.json"), JSON.stringify({ scripts: { test: "vitest" } }));
+      await writeFile(path.join(project.root, "openapi.yaml"), "openapi: 3.0.0\ninfo:\n  title: Demo\n");
+
+      const detected = await detectProjectPresets(project.root);
+      expect(detected.presets).toEqual(expect.arrayContaining(["project", "api"]));
+      expect(detected.languages).toContain("javascript");
+
+      await initContextGraph(project.root);
+      const config = await loadConfig(project.root);
+
+      expect(config.presets).toEqual(expect.arrayContaining(["project", "api"]));
+      expect(config.detectedProject?.languages).toContain("javascript");
+      expect(config.sources).toContain("**/openapi.yaml");
+      expect(config.sources).not.toContain("**/*.ts");
     } finally {
       await project.cleanup();
     }

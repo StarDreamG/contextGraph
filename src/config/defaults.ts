@@ -1,22 +1,11 @@
 import type { ContextGraphConfig } from "../types/domain.js";
+import { resolvePresetSources } from "./presets.js";
 
 export const DEFAULT_CONFIG: ContextGraphConfig = {
   version: 1,
   projectName: "",
-  sources: [
-    "**/AGENTS.md",
-    "**/CLAUDE.md",
-    "**/README.md",
-    "docs/**/*.md",
-    ".cursor/rules/**/*",
-    "**/.cursor/rules/**/*",
-    "**/bruno/**/*",
-    "**/tests/**/*",
-    "**/test/**/*",
-    "**/playwright.config.*",
-    "**/package.json",
-    "**/pom.xml"
-  ],
+  presets: ["project"],
+  sources: resolvePresetSources(["project"]),
   ignore: [
     ".env",
     "**/.env",

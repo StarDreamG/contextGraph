@@ -37,20 +37,20 @@ Level 0 后续还要继续加固中文 trigram 片段检索、query 结果字段
    - query 结果字段稳定
    - 中文 trigram / LIKE fallback 补强
 2. **Brief Productization**
-   - `contextgraph brief`
-   - `contextgraph brief --task "修改区块链附件上传"`
-   - `contextgraph brief --file ...`
-   - `contextgraph brief --domain blockchain`
+   - `contextgraph brief`：已具备首版
+   - `contextgraph brief --task "修改区块链附件上传"`：已具备首版
+   - `contextgraph brief --file ...`：已具备首版
+   - `contextgraph brief --domain blockchain`：已具备首版
 3. **Experience-to-Source Association**
-   - 从文档、handoff、测试中抽文件路径、模块名和测试命令
-   - 建立 `RELATED_TO_FILE`、`APPLIES_TO`、`REQUIRES_TEST`
-   - 支持 `query --file` / `query --module`
+   - 从文档、handoff、测试中抽文件路径、模块名和测试命令：已具备首版
+   - 建立 `RELATED_TO_FILE`、`APPLIES_TO`、`REQUIRES_TEST`：已具备首版
+   - 支持 `query --file` / `query --module`：已具备首版
 4. **Project Detector + Presets**
-   - `basic`
-   - `project`
-   - `api`
-   - `source-comments`
-   - `source`
+   - `basic`：已具备首版
+   - `project`：已具备首版
+   - `api`：已具备首版扫描 preset，结构化 API parser 待做
+   - `source-comments`：保留 preset 边界，注释抽取待做
+   - `source`：保留显式边界，不默认启用
 5. **Embedding**
    - 等 Level 0 和关联能力稳定后再接入
 6. **LLM Extractor**
@@ -195,13 +195,16 @@ Preset 规划：
 
 Project detector:
 
-- `init` / `index` 应根据目录结构和标志文件自动识别 JS/Vue/Node、Python、Java/Maven、Go、Rust 等项目类型，并选择更合适的默认 include。
-- framework-aware defaults 要覆盖项目关键入口。例如 JS/Vue 项目应自动纳入 `src/**/*.{js,ts,vue,jsx,tsx}`、`server/**/*.{js,ts,mjs,cjs}`、`scripts/**/*.{js,ts,mjs,cjs}`、`vite.config.*`、`package.json`、`Dockerfile*`、`docker-compose*.yml`、`bruno/**/*` 和 `tests/**/*`。
-- source 索引必须避免扫入低价值或高噪声内容，例如 `node_modules`、构建产物、锁文件、生成文件、大型静态资源、二进制文件和历史数据库。
+- `init` 已根据目录结构和标志文件自动识别 JS/Node、Python、Java/Maven、Go、Rust、Docker 和 OpenAPI / Swagger。
+- 默认 `project` preset 覆盖 agent-facing docs、rules、tests、Bruno、Playwright、package/pom/pyproject/go/cargo、Docker 和 OpenAPI / Swagger。
+- 默认 preset 不纳入 `src/**/*.ts`、`src/**/*.js` 或普通源码实现，避免把 ContextGraph 误用成源码知识图谱。
+- source / source-comments 必须显式启用，并继续避免扫入低价值或高噪声内容，例如 `node_modules`、构建产物、锁文件、生成文件、大型静态资源、二进制文件和历史数据库。
 
 ## v0.2.x: API Contract Preset
 
 目标：把 Swagger / OpenAPI 作为接口契约纳入项目经验图谱，让 Agent 在修改接口、测试、客户端集成或部署配置前能看到当前接口边界。
+
+首版状态：`contextgraph index --preset api` 已可额外扫描 OpenAPI / Swagger 文件；结构化 API 节点解析仍在后续切片中实现。
 
 新增命令：
 

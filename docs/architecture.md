@@ -35,7 +35,15 @@ agent-facing sources
   -> CLI / MCP query surface
 ```
 
-Current source classes include README, AGENTS.md, CLAUDE.md, docs, Cursor rules, tests, Bruno collections, package metadata, and handoff summaries.
+Current source classes include README, AGENTS.md, CLAUDE.md, docs, Cursor rules, tests, Bruno collections, package metadata, Docker metadata, OpenAPI / Swagger contracts, and handoff summaries.
+
+Source selection is controlled by safe presets:
+
+- `basic`: agent-facing docs, rules, and test documentation.
+- `project`: basic plus common project metadata, tests, Bruno, Playwright, package/pom/pyproject/go/cargo, Docker, and OpenAPI / Swagger.
+- `api`: OpenAPI / Swagger contracts.
+- `source-comments`: reserved for high-value source comment extraction; not enabled by default.
+- `source`: explicit boundary for future source-adjacent indexing; not enabled by default and not a code graph.
 
 Current storage is local SQLite:
 
@@ -90,13 +98,13 @@ Swagger / OpenAPI belongs to ContextGraph when it acts as an interface contract.
 
 It does not make ContextGraph a backend source-code graph. It provides contract facts that help agents understand API boundaries before changing code, tests, deployment configuration, or client integrations.
 
-Planned `v0.2.x` command:
+Implemented first-slice command:
 
 ```bash
 contextgraph index --preset api
 ```
 
-Planned default scan patterns:
+Current scan patterns:
 
 - `openapi.json`
 - `openapi.yaml`
@@ -105,7 +113,7 @@ Planned default scan patterns:
 - `docs/**/openapi*.json`
 - `docs/**/swagger*.yaml`
 
-The OpenAPI parser should extract:
+The first slice scans these files as high-value contract sources. The OpenAPI parser should later extract:
 
 - endpoint
 - method
