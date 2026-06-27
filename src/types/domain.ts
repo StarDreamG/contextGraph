@@ -107,6 +107,9 @@ export interface QueryResult {
   rank: number;
   matchedQuery: string;
   matchedByExpandedQuery: boolean;
+  relatedFiles: string[];
+  testCommands: string[];
+  modules: string[];
 }
 
 export interface ContextIndexSnapshot {

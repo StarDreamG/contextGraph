@@ -74,7 +74,7 @@ export class ContextGraphMcpRuntime {
   }
 
   async getRelevantContext(input: RelevantContextInput): Promise<McpRelevantContextResponse> {
-    const query = [input.task, ...(input.files ?? [])].join(" ").trim();
+    const query = input.task.trim();
     const status = await this.getStatus();
     if (!status.diagnostics.initialized) {
       return this.emptyContext(query, status, ["ContextGraph is not initialized. Run: contextgraph init"], [
@@ -89,7 +89,7 @@ export class ContextGraphMcpRuntime {
     }
 
     return {
-      ...(await queryContext(this.projectRoot, query)),
+      ...(await queryContext(this.projectRoot, query, { files: input.files })),
       diagnostics: status.diagnostics
     };
   }

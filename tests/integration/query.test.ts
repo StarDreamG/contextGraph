@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { indexContextGraph } from "../../src/core/indexService.js";
 import { initContextGraph } from "../../src/core/initService.js";
 import { queryContext } from "../../src/core/queryService.js";
+import { openDatabase } from "../../src/storage/database.js";
 import { createTempProject } from "../helpers/project.js";
 
 describe("query", () => {
@@ -104,6 +105,51 @@ describe("query", () => {
       expect(result.suggestions).toEqual(
         expect.arrayContaining(["try a shorter entity query", "try a known port/config/file name"])
       );
+    } finally {
+      await project.cleanup();
+    }
+  });
+
+  it("returns file and module scoped project experience without claiming code intelligence", async () => {
+    const project = await createTempProject();
+    try {
+      await writeFile(
+        path.join(project.root, "AGENTS.md"),
+        [
+          "## 区块链上传模块",
+          "修改 src/blockchain/upload.ts 必须运行 npm test -- blockchain-upload。",
+          "upload 模块历史失败：failed because txid 丢失，修复方案是保留回执映射。",
+          "",
+          "## 普通导出模块",
+          "修改 src/export/report.ts 必须运行 npm test -- export。"
+        ].join("\n")
+      );
+      await initContextGraph(project.root);
+      await indexContextGraph(project.root);
+
+      const byFile = await queryContext(project.root, "相关规约", { file: "src/blockchain/upload.ts" });
+      expect(byFile.results.length).toBeGreaterThan(0);
+      expect(byFile.results.some((item) => item.relatedFiles.includes("src/blockchain/upload.ts"))).toBe(true);
+      expect(byFile.results.some((item) => item.testCommands.includes("npm test -- blockchain-upload"))).toBe(true);
+      expect(byFile.results.some((item) => item.content.includes("npm test -- export"))).toBe(false);
+
+      const byModule = await queryContext(project.root, "历史失败", { module: "upload" });
+      expect(byModule.results.some((item) => item.modules.includes("upload"))).toBe(true);
+      expect(byModule.results.some((item) => item.content.includes("txid 丢失"))).toBe(true);
+
+      const db = openDatabase(path.join(project.root, ".contextgraph", "graph.db"));
+      try {
+        const relations = db
+          .prepare("SELECT DISTINCT relation FROM edges WHERE relation IN ('RELATED_TO_FILE', 'APPLIES_TO', 'REQUIRES_TEST')")
+          .all() as Array<{ relation: string }>;
+        expect(relations.map((row) => row.relation).sort()).toEqual([
+          "APPLIES_TO",
+          "RELATED_TO_FILE",
+          "REQUIRES_TEST"
+        ]);
+      } finally {
+        db.close();
+      }
     } finally {
       await project.cleanup();
     }

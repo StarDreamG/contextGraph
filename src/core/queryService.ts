@@ -14,6 +14,12 @@ export interface ContextQueryResponse {
   suggestions: string[];
 }
 
+export interface QueryOptions {
+  file?: string;
+  files?: string[];
+  module?: string;
+}
+
 interface QueryRow {
   id: string;
   type: QueryResult["type"];
@@ -30,14 +36,15 @@ interface QueryRow {
   matchedByExpandedQuery: boolean;
 }
 
-export async function queryContext(projectRoot: string, query: string): Promise<ContextQueryResponse> {
+export async function queryContext(projectRoot: string, query: string, options: QueryOptions = {}): Promise<ContextQueryResponse> {
   const trimmed = query.trim();
   if (trimmed.length === 0) {
     throw new Error("Query must not be empty.");
   }
 
   const status = await getContextStatus(projectRoot);
-  const queryPlan = buildQueryPlan(trimmed);
+  const scopedQuery = scopedQueryText(trimmed, options);
+  const queryPlan = buildQueryPlan(scopedQuery);
   const db = openDatabase(path.join(projectRoot, ".contextgraph", "graph.db"));
   const directRows = runQueryForText(db, queryPlan.normalizedQuery, queryPlan.normalizedQuery, false);
   const rows = collectRows(db, queryPlan, directRows);
@@ -45,6 +52,7 @@ export async function queryContext(projectRoot: string, query: string): Promise<
 
   const results = rows
     .map((row) => toQueryResult(row, status.status))
+    .filter((result) => matchesQueryScope(result, options))
     .sort((left, right) => resultScore(right, queryPlan) - resultScore(left, queryPlan))
     .slice(0, 10);
 
@@ -71,6 +79,10 @@ export async function queryContext(projectRoot: string, query: string): Promise<
           ]
         : []
   };
+}
+
+function scopedQueryText(query: string, options: QueryOptions): string {
+  return [query, ...scopeFiles(options), options.module].filter(Boolean).join(" ");
 }
 
 function collectRows(
@@ -245,8 +257,36 @@ function toQueryResult(row: QueryRow, freshness: QueryResult["freshness"]): Quer
     freshness,
     rank: row.rank,
     matchedQuery: row.matchedQuery,
-    matchedByExpandedQuery: Boolean(row.matchedByExpandedQuery)
+    matchedByExpandedQuery: Boolean(row.matchedByExpandedQuery),
+    relatedFiles: readStringArray(metadata.relatedFiles),
+    testCommands: readStringArray(metadata.testCommands),
+    modules: readStringArray(metadata.modules)
   };
+}
+
+function matchesQueryScope(result: QueryResult, options: QueryOptions): boolean {
+  const files = scopeFiles(options);
+  if (files.length === 0 && !options.module) {
+    return true;
+  }
+  const haystack = `${result.title}\n${result.content}\n${result.sourcePath ?? ""}`.toLowerCase();
+  for (const candidateFile of files) {
+    const file = candidateFile.toLowerCase();
+    if (result.relatedFiles.map((value) => value.toLowerCase()).includes(file) || haystack.includes(file)) {
+      return true;
+    }
+  }
+  if (options.module) {
+    const moduleName = options.module.toLowerCase();
+    if (result.modules.map((value) => value.toLowerCase()).includes(moduleName) || haystack.includes(moduleName)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function scopeFiles(options: QueryOptions): string[] {
+  return [options.file, ...(options.files ?? [])].filter((value): value is string => Boolean(value));
 }
 
 function resultScore(result: QueryResult, queryPlan: QueryPlan): number {
@@ -309,6 +349,10 @@ function parseMetadata(raw: string | null): Record<string, unknown> {
 
 function readPriority(value: unknown): Priority | null {
   return value === "P0" || value === "P1" || value === "P2" || value === "P3" || value === "P4" ? value : null;
+}
+
+function readStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
 function excerpt(content: string): string {

@@ -1,16 +1,25 @@
 import type { Command } from "commander";
 import { queryContext } from "../core/queryService.js";
 
+interface QueryOptions {
+  file?: string;
+  module?: string;
+}
+
 export function registerQueryCommand(program: Command): void {
   program
     .command("query")
     .description("Search relevant project context")
     .argument("<query>", "Natural language task or context query")
-    .action(async (query: string) => {
-      const response = await queryContext(process.cwd(), query);
+    .option("--file <path>", "Return project experience related to a file path")
+    .option("--module <name>", "Return project experience related to a module name")
+    .action(async (query: string, options: QueryOptions) => {
+      const response = await queryContext(process.cwd(), query, { file: options.file, module: options.module });
       console.log("ContextGraph Query");
       console.log("────────────────────────────────");
       console.log(`Query: ${response.query}`);
+      if (options.file) console.log(`File: ${options.file}`);
+      if (options.module) console.log(`Module: ${options.module}`);
       console.log(`Status: ${response.status.status}`);
       console.log(`Reliability: ${response.status.reliability}`);
       for (const warning of response.warnings) {

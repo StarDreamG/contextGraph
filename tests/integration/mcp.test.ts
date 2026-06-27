@@ -56,4 +56,32 @@ describe("mcp server", () => {
       await project.cleanup();
     }
   });
+
+  it("uses MCP file scopes for relevant context", async () => {
+    const project = await createTempProject();
+    try {
+      await writeFile(
+        path.join(project.root, "AGENTS.md"),
+        [
+          "## 上传经验",
+          "修改 src/upload.ts 必须运行 npm test -- upload。",
+          "",
+          "## 导出经验",
+          "修改 src/export.ts 必须运行 npm test -- export。"
+        ].join("\n")
+      );
+      await initContextGraph(project.root);
+      await indexContextGraph(project.root);
+
+      const runtime = new ContextGraphMcpRuntime({ projectRoot: project.root });
+      const response = await runtime.getRelevantContext({ task: "相关测试", files: ["src/upload.ts"] });
+
+      expect(response.results.length).toBeGreaterThan(0);
+      expect(response.results.some((item) => item.relatedFiles.includes("src/upload.ts"))).toBe(true);
+      expect(response.results.some((item) => item.testCommands.includes("npm test -- upload"))).toBe(true);
+      expect(response.results.some((item) => item.content.includes("npm test -- export"))).toBe(false);
+    } finally {
+      await project.cleanup();
+    }
+  });
 });

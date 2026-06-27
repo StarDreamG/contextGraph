@@ -4,6 +4,7 @@ import path from "node:path";
 import { loadConfig } from "../config/loadConfig.js";
 import { currentGitHead } from "../git/gitState.js";
 import { classifyBlock } from "../indexing/classifier.js";
+import { extractExperienceFacts } from "../indexing/experience.js";
 import { sha256, stableId } from "../indexing/hash.js";
 import { buildEdgesForBlock } from "../indexing/relationships.js";
 import { scanSources } from "../indexing/scanner.js";
@@ -195,7 +196,7 @@ function toNodeRecords(
   drafts: ReturnType<typeof classifyBlock>,
   timestamp: string
 ): NodeRecord[] {
-  return drafts.map((draft) => ({
+  const nodes = drafts.map((draft) => ({
     id: stableId("node", block.id, draft.type, sha256(draft.content)),
     type: draft.type,
     title: draft.title,
@@ -208,4 +209,28 @@ function toNodeRecords(
     createdAt: timestamp,
     updatedAt: timestamp
   }));
+  const experience = extractExperienceFacts(block.content);
+  const fileNodes: NodeRecord[] = experience.files.map((file) => ({
+    id: stableId("node", block.id, "File", file),
+    type: "File",
+    title: file,
+    content: `Related file: ${file}`,
+    sourceId: block.sourceId,
+    blockId: block.id,
+    confidence: 1,
+    status: "confirmed",
+    metadata: {
+      sourceId: block.sourceId,
+      blockId: block.id,
+      filePath: file,
+      relatedFiles: [file],
+      testCommands: experience.testCommands,
+      modules: experience.modules,
+      priority: "P3",
+      priorityReason: "related source file path"
+    },
+    createdAt: timestamp,
+    updatedAt: timestamp
+  }));
+  return [...nodes, ...fileNodes];
 }

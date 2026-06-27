@@ -18,6 +18,23 @@ export function buildEdgesForBlock(nodes: NodeRecord[], timestamp: string): Edge
     }
   }
 
+  const fileNodes = nodes.filter((node) => node.type === "File");
+  const testNodes = nodes.filter((node) => node.type === "Test");
+  for (const fileNode of fileNodes) {
+    const filePath = readString(fileNode.metadata.filePath);
+    if (!filePath) continue;
+    for (const node of nodes) {
+      if (node.type === "File" || !readStringArray(node.metadata.relatedFiles).includes(filePath)) {
+        continue;
+      }
+      addEdge(edges, node, fileNode, "RELATED_TO_FILE", timestamp);
+      addEdge(edges, node, fileNode, "APPLIES_TO", timestamp);
+    }
+    for (const testNode of testNodes) {
+      addEdge(edges, fileNode, testNode, "REQUIRES_TEST", timestamp);
+    }
+  }
+
   return [...edges.values()];
 }
 
@@ -45,4 +62,12 @@ function addEdge(
     },
     createdAt: timestamp
   });
+}
+
+function readString(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function readStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }

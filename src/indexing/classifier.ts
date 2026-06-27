@@ -1,4 +1,5 @@
 import type { NodeType } from "../types/domain.js";
+import { extractExperienceFacts } from "./experience.js";
 import { assessPriority } from "./priority.js";
 
 export interface ClassifyInput {
@@ -51,6 +52,7 @@ export function classifyBlock(input: ClassifyInput): NodeDraft[] {
 function toNode(type: NodeType, input: ClassifyInput): NodeDraft {
   const title = input.title ?? type;
   const priority = assessPriority(type, title, input.content);
+  const experience = extractExperienceFacts(input.content);
 
   return {
     type,
@@ -62,7 +64,10 @@ function toNode(type: NodeType, input: ClassifyInput): NodeDraft {
       sourceId: input.sourceId,
       blockId: input.blockId,
       priority: priority.priority,
-      priorityReason: priority.reason
+      priorityReason: priority.reason,
+      relatedFiles: experience.files,
+      testCommands: experience.testCommands,
+      modules: experience.modules
     }
   };
 }
