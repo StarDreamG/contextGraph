@@ -34,7 +34,7 @@ describe("CLI e2e", () => {
     ].join("/");
 
     expect(packageJson.name).toBe("@stardreamg/contextgraph");
-    expect(packageJson.version).toBe("0.1.1");
+    expect(packageJson.version).toBe("0.1.2");
     expect(packageJson.private).not.toBe(true);
     expect(packageJson.license).toBe("Apache-2.0");
     expect(packageJson.main).toBe("dist/cli/main.js");
