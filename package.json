@@ -1,7 +1,7 @@
 {
   "name": "@stardreamg/contextgraph",
   "version": "0.1.2",
-  "description": "Local-first context graph for coding agents.",
+  "description": "Local-first operational memory for coding agents.",
   "license": "Apache-2.0",
   "type": "module",
   "main": "dist/cli/main.js",
@@ -11,6 +11,29 @@
   "engines": {
     "node": ">=22 <25"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/StarDreamG/contextGraph.git"
+  },
+  "bugs": {
+    "url": "https://github.com/StarDreamG/contextGraph/issues"
+  },
+  "homepage": "https://github.com/StarDreamG/contextGraph#readme",
+  "keywords": [
+    "coding-agent",
+    "ai-agent",
+    "agent-memory",
+    "mcp",
+    "local-first",
+    "context",
+    "handoff",
+    "sqlite",
+    "fts5",
+    "developer-tools",
+    "codex",
+    "claude",
+    "cursor"
+  ],
   "files": [
     "bin",
     "dist",

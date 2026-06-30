@@ -10,6 +10,62 @@ The product opportunity is to stop coding agents from treating a local README or
 
 AGENTS.md should remain the human-readable entrypoint for agents. ContextGraph is the indexed global view behind that entrypoint: it stores small, traceable, queryable experience blocks and tells agents whether those blocks are current enough to trust.
 
+## Knowledge Governance Principle
+
+ContextGraph must not become a silent knowledge writer by default.
+
+Core principle:
+
+```text
+ContextGraph can collect and surface project memory.
+ContextGraph should not silently rewrite project truth.
+```
+
+中文原则：
+
+```text
+ContextGraph 可以收集和暴露项目经验，但不能静默改写项目真相。
+```
+
+Default responsibilities:
+
+- read project knowledge
+- index continuously
+- show freshness
+- expose trusted context to coding agents
+
+Default prohibitions:
+
+- do not silently rewrite README, AGENTS.md, or docs
+- do not turn agent guesses into confirmed project truth
+- do not inject old handoff history as current truth
+- do not tell agents to update source-of-truth docs without human approval
+
+Default policy shape:
+
+```json
+{
+  "knowledgePolicy": {
+    "mode": "read-only",
+    "sourceOfTruth": [],
+    "writableTargets": []
+  }
+}
+```
+
+Default read-only mode allows:
+
+- reading README, AGENTS.md, CLAUDE.md, docs, handoff, config, and tests
+- writing `.contextgraph/graph.db`
+- writing `.contextgraph/status.json`
+- writing internal caches
+
+Default read-only mode forbids:
+
+- modifying README, AGENTS.md, or docs
+- automatically promoting handoff-derived or extractor-derived facts to confirmed project truth
+- returning MCP instructions that imply an agent may update source-of-truth docs without human approval
+
 ## Architecture Levels
 
 ## Current Engineering Priority
@@ -45,6 +101,246 @@ The next work should be ordered by trust and usability, not by model sophisticat
    - optional, local-first, cached, candidate by default, and schema validated
 
 Embedding must not hide weak status semantics, stale MCP state, unclear brief output, or unstable query fields.
+
+## Knowledge Governance / Handoff / Watcher Development Stages
+
+These stages are planned before any automatic documentation writing. They are about trust, visibility, and freshness, not about changing project truth.
+
+### P0: Documentation And Plan
+
+Status: documented in ROADMAP, docs/dev-plan, and TODO. No core logic changes in this slice.
+
+Scope:
+
+- record the read-only knowledge policy
+- name the diagnostics as Knowledge Hygiene, Documentation Debt, Source-of-Truth Warnings, or Candidate Memory Review
+- avoid names such as Write Suggestions or Auto Documentation Fix
+- record that ContextGraph may surface candidate memory but must not silently rewrite project truth
+- document MCP's stricter safety boundary
+- document handoff latest/history semantics
+- document daemon priority over knowledge writing
+
+Acceptance:
+
+- ROADMAP documents the principle and priorities.
+- docs/dev-plan documents config shape and safety boundaries.
+- TODO lists executable follow-up tasks by priority.
+- No runtime behavior changes are included in this slice.
+
+### P1: Handoff Reliability And Visibility
+
+Handoff must be append-only.
+
+Semantics:
+
+- `latest handoff` is the current baton.
+- `handoff history` is archive, audit log, and incident investigation evidence.
+- Historical handoff is not current project truth unless confirmed by newer docs or user instruction.
+
+Planned commands:
+
+```bash
+contextgraph handoff latest
+contextgraph handoff list
+contextgraph handoff show <sessionId>
+contextgraph handoff search "<query>"
+```
+
+Required behavior:
+
+- `latest` shows only the latest handoff.
+- `list` shows the latest 10 records by `ended_at` descending by default.
+- `show` returns the full record for a session id.
+- `search` searches historical handoff but marks freshness, age, and historical usage limits.
+- `brief` includes only the latest handoff by default.
+- `brief` may show historical count and point to `contextgraph handoff list`.
+
+Session id:
+
+```text
+timestamp-ms + agent-slug + short-random-id
+```
+
+Example:
+
+```text
+2026-06-29-185930-123-codex-a1b2c3
+```
+
+Freshness labels:
+
+- current
+- recent
+- stale
+- historical
+- possibly_outdated
+- superseded
+
+MCP historical handoff response must include:
+
+```json
+{
+  "type": "handoff",
+  "freshness": "historical",
+  "ageDays": 28,
+  "trust": "low_for_current_state",
+  "usage": "Use only as historical context, not as current project truth unless confirmed by newer docs or user instruction."
+}
+```
+
+Handoff-derived facts:
+
+- `AgentSession` may be confirmed because the session record exists.
+- handoff-derived Rule, Failure, Fix, Decision, and EnvironmentFact default to `candidate` or `session-derived`.
+- metadata must include `source: handoff`, `sessionId`, and `requiresHumanReview: true`.
+
+Future handoff fields:
+
+- assumptions
+- risks
+- testsRun
+- testsPassed
+- knownIssues
+- nextSteps
+- basedOnSessionId
+
+Handoff evolution tools:
+
+```bash
+contextgraph handoff timeline
+contextgraph handoff timeline --file <path>
+contextgraph handoff trace --file <path>
+contextgraph handoff trace --query "区块链重复上链"
+```
+
+Preferred terms are trace, timeline, audit, and regression investigation. Avoid blame-oriented naming.
+
+### P2: Watcher / Daemon / Stale Reminder
+
+Fresh indexing comes before knowledge writing.
+
+Keep foreground debug mode:
+
+```bash
+contextgraph watch
+```
+
+Planned daemon commands:
+
+```bash
+contextgraph daemon start
+contextgraph daemon stop
+contextgraph daemon restart
+contextgraph daemon status
+contextgraph daemon logs
+```
+
+Rules:
+
+- Do not auto-start daemon after `npm install -g @stardreamg/contextgraph`.
+- `contextgraph init` may ask whether to enable background indexing, but must not silently enable it.
+- Status should remind users to run `contextgraph index` or start daemon when source hash, Git HEAD, or source mtime changes.
+
+Future status panel:
+
+```text
+Indexer
+  Mode: daemon | manual
+  State: running | disabled | stale | error
+  PID: ...
+  Last event: ...
+  Last indexed: ...
+  Pending changes: ...
+  Freshness: Fresh | Stale
+```
+
+### P3: Knowledge Hygiene Diagnostics
+
+Status may surface read-only diagnostics:
+
+- handoff-only high-priority facts
+- stale source warnings
+- possible conflicts
+- fragmented topic clusters
+- candidate memory count
+
+Allowed output:
+
+```text
+Knowledge Hygiene
+  Handoff-only P1 facts: 2
+  Stale source warnings: 1
+  Possible conflicts: 1
+  Fragmented topic clusters: 3
+  Suggested action: human review recommended
+```
+
+Allowed recommendation:
+
+```text
+2 P1-level facts appear only in recent handoff notes.
+Consider reviewing them and promoting confirmed facts into project source-of-truth docs.
+```
+
+Forbidden default recommendation:
+
+```text
+Write these facts into AGENTS.md.
+```
+
+Do not recommend concrete target files unless `sourceOfTruth` and `writableTargets` are explicitly configured.
+
+MCP must be more conservative than CLI:
+
+```json
+{
+  "knowledgeHygiene": {
+    "recommendation": "Human review recommended before updating project documentation.",
+    "agentActionAllowed": false,
+    "requiresHumanApproval": true
+  }
+}
+```
+
+### P4: Candidate Memory / Patch Proposal
+
+Candidate memory is optional and must be explicitly enabled.
+
+Planned commands:
+
+```bash
+contextgraph note add
+contextgraph note list
+contextgraph note approve
+contextgraph note reject
+contextgraph note export
+```
+
+Default storage:
+
+- `.contextgraph/inbox/`
+- or explicit `docs/contextgraph-candidates.md`
+
+Candidate metadata:
+
+- `status: candidate`
+- `requiresHumanReview: true`
+- `source: agent`
+- `confidence: low | medium | high`
+
+State flow:
+
+```text
+candidate -> human_reviewed -> confirmed -> deprecated -> superseded
+```
+
+Confirmed facts can only come from:
+
+- formal documentation
+- human confirmation
+- explicit handoff statement plus human approval
+- test verification
+- high-confidence extractor output plus schema validation and review
 
 ### Level 0: Base Mode
 
@@ -873,6 +1169,22 @@ Do not build these in the next phase:
    - required tests recommendation
    - approval flow for candidate items
 
+13. Knowledge governance and handoff safety
+   - add default read-only `knowledgePolicy`
+   - ensure no command silently modifies README, AGENTS.md, or docs
+   - add handoff latest/list/show/search
+   - make handoff append-only and collision-resistant
+   - keep historical handoff out of brief by default
+   - mark handoff-derived facts as candidate/session-derived
+   - expose Knowledge Hygiene as read-only diagnostics
+
+14. Background indexing daemon
+   - add `contextgraph daemon start|stop|restart|status|logs`
+   - store pid/state/logs under `.contextgraph`
+   - add status Indexer panel
+   - show stale reminder when daemon is disabled and sources changed
+   - never auto-start daemon on npm install
+
 ## Acceptance Criteria
 
 Future implementation work must satisfy:
@@ -903,3 +1215,9 @@ Future implementation work must satisfy:
 24. Status clearly separates Context index, Embedding index, Extractor index, Candidate edge count, Confirmed edge count, and Pending semantic edge blocks.
 25. Query results include source, line range, domain, priority, confidence, status, and freshness.
 26. Every new feature has focused tests.
+27. Default `knowledgePolicy` is read-only.
+28. No command silently modifies README, AGENTS.md, or docs.
+29. Status Knowledge Hygiene does not include direct write instructions by default.
+30. MCP Knowledge Hygiene sets `agentActionAllowed=false` and `requiresHumanApproval=true` by default.
+31. Handoff is append-only and session ids are collision-resistant.
+32. `brief` includes only latest handoff by default and labels historical handoff as historical/stale when queried.

@@ -1,29 +1,32 @@
 ## Summary
-Describe what this PR changes.
 
 ## Related Issue
+
 Fixes #
 
-## Requirement Scope
-What part of the Issue is implemented?
+## Type of change
 
-## Changes
-- 
-- 
-- 
+- [ ] docs
+- [ ] bug fix
+- [ ] feature
+- [ ] refactor
+- [ ] test
+- [ ] security
 
-## How to Test
-- 
-- 
+## What changed
 
-## Acceptance Criteria Checklist
-- [ ] All Issue acceptance criteria are satisfied
-- [ ] Tests or manual verification are included
-- [ ] No unrelated scope expansion
-- [ ] Docs updated if stable product behavior changed
+## How to test
 
-## Risks
-List risks, edge cases, or migration concerns.
+## Checklist
 
-## Follow-up
-List remaining work or follow-up Issues.
+- [ ] I did not add remote upload by default.
+- [ ] I did not add runtime LLM calls to query.
+- [ ] I did not weaken secret redaction.
+- [ ] I ran `npm run build`.
+- [ ] I ran `npm run check`.
+- [ ] I ran `npm test`.
+- [ ] I updated docs if behavior changed.
+
+## Risk and rollback notes
+
+## Unfinished items

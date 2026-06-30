@@ -1,8 +1,56 @@
 name: Bug report
-description: Report a reproducible defect
+description: Report a reproducible ContextGraph defect
 title: "[Bug]: "
 labels: ["bug", "needs-triage"]
 body:
+  - type: input
+    id: contextgraph_version
+    attributes:
+      label: ContextGraph version
+      placeholder: "@stardreamg/contextgraph@0.1.2"
+    validations:
+      required: true
+  - type: input
+    id: node_version
+    attributes:
+      label: Node.js version
+      placeholder: "node -v"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      placeholder: "macOS 15, Ubuntu 24.04, Windows 11, etc."
+    validations:
+      required: true
+  - type: dropdown
+    id: interface
+    attributes:
+      label: Interface
+      options:
+        - CLI
+        - MCP
+        - both
+    validations:
+      required: true
+  - type: dropdown
+    id: initialized
+    attributes:
+      label: Is the project initialized with ContextGraph?
+      options:
+        - "yes"
+        - "no"
+        - "not sure"
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command or MCP tool call
+      render: shell
+    validations:
+      required: true
   - type: textarea
     id: problem
     attributes:
@@ -33,18 +81,17 @@ body:
     validations:
       required: true
   - type: textarea
-    id: acceptance_criteria
+    id: status_output
     attributes:
-      label: Fix acceptance criteria
-      value: |
-        - [ ] 
-        - [ ] 
+      label: Sanitized status output
+      description: Paste `contextgraph status` output after removing sensitive paths or data.
+      render: text
     validations:
-      required: true
+      required: false
   - type: textarea
-    id: environment
+    id: reproduction
     attributes:
-      label: Environment
-      description: OS, browser, version, branch, commit, etc.
+      label: Minimal sanitized reproduction
+      description: Do not include real tokens, private keys, production IPs, customer data, or proprietary content.
     validations:
       required: false

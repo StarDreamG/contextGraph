@@ -59,6 +59,229 @@ Level 0 后续还要继续加固中文 trigram 片段检索、query 结果字段
 
 Embedding 和 LLM 不能用来掩盖基础状态、MCP 生命周期、brief 组织能力和查询字段稳定性问题。
 
+## Knowledge Governance / Handoff / Watcher Priority
+
+ContextGraph 后续必须明确一条产品边界：它可以收集和暴露项目经验，但不能静默改写项目真相。
+
+Core principle:
+
+```text
+ContextGraph can collect and surface project memory.
+ContextGraph should not silently rewrite project truth.
+```
+
+中文原则：
+
+```text
+ContextGraph 可以收集和暴露项目经验，但不能静默改写项目真相。
+```
+
+默认职责：
+
+- read project knowledge
+- index continuously
+- show freshness
+- expose trusted context to coding agents
+
+默认不做：
+
+- silently rewrite README / AGENTS.md / docs
+- turn agent guesses into confirmed project truth
+- inject old handoff history as current truth
+- tell agents to update source-of-truth docs without human approval
+
+### P0: Documentation And Plan
+
+本阶段先沉淀设计，不立刻大改核心逻辑：
+
+- 明确默认 `knowledgePolicy.mode = read-only`。
+- 明确允许写入 `.contextgraph/graph.db`、`.contextgraph/status.json` 和内部缓存。
+- 明确默认不允许修改 README / AGENTS.md / docs。
+- 明确 handoff、extractor、embedding 推断默认不能提升为 confirmed project truth。
+- 明确 status 只能显示 Knowledge Hygiene / Documentation Debt / Source-of-Truth Warnings / Candidate Memory Review，不默认给出具体写入目标文件。
+
+默认配置草案：
+
+```json
+{
+  "knowledgePolicy": {
+    "mode": "read-only",
+    "sourceOfTruth": [],
+    "writableTargets": []
+  }
+}
+```
+
+### P1: Handoff Reliability And Visibility
+
+Handoff 必须是 append-only。`latest handoff` 是当前接力棒，`handoff history` 是历史档案、审计日志和事故回溯证据链。
+
+计划命令：
+
+```bash
+contextgraph handoff latest
+contextgraph handoff list
+contextgraph handoff show <sessionId>
+contextgraph handoff search "<query>"
+```
+
+可靠性要求：
+
+- sessionId 改为 `timestamp-ms + agent-slug + short-random-id`，例如 `2026-06-29-185930-123-codex-a1b2c3`。
+- 连续两次 handoff 不覆盖。
+- 同一 agent 快速 handoff 不撞 ID。
+- `brief` 默认只显示最新一条 handoff。
+- 历史 handoff 只作为 historical / stale / possibly_outdated 上下文，不默认当作当前事实。
+- `AgentSession` 本身可以是 confirmed，但 handoff-derived Rule / Failure / Fix / Decision / EnvironmentFact 默认只能是 `candidate` 或 `session-derived`。
+
+历史 handoff 返回时必须带信任提示：
+
+```json
+{
+  "type": "handoff",
+  "freshness": "historical",
+  "ageDays": 28,
+  "trust": "low_for_current_state",
+  "usage": "Use only as historical context, not as current project truth unless confirmed by newer docs or user instruction."
+}
+```
+
+后续增强：
+
+```bash
+contextgraph handoff timeline
+contextgraph handoff timeline --file <path>
+contextgraph handoff trace --file <path>
+contextgraph handoff trace --query "区块链重复上链"
+```
+
+产品语义是追踪项目上下文如何在多轮 agent 交接中演化。优先使用 `trace`、`timeline`、`audit`、`regression investigation`，不要过早使用 `blame` 命名。
+
+未来 handoff 字段应增强为：
+
+- assumptions
+- risks
+- testsRun
+- testsPassed
+- knownIssues
+- nextSteps
+- basedOnSessionId
+
+### P2: Watcher / Daemon / Stale Reminder
+
+Watcher / daemon 的优先级高于知识写入。因为 ContextGraph 默认从项目已有知识抽取，所以必须优先保证索引持续新鲜。
+
+保留前台调试模式：
+
+```bash
+contextgraph watch
+```
+
+新增后台模式：
+
+```bash
+contextgraph daemon start
+contextgraph daemon stop
+contextgraph daemon restart
+contextgraph daemon status
+contextgraph daemon logs
+```
+
+安全边界：
+
+- `npm install -g @stardreamg/contextgraph` 后不要自动启动 daemon。
+- `contextgraph init` 未来可以询问是否启用后台索引，但默认不能悄悄开启。
+- 没有 daemon 且 source hash / git HEAD / source mtime 变化时，status 应提醒运行 `contextgraph index` 或启动 daemon。
+
+未来 status 顶部应显示：
+
+```text
+Indexer
+  Mode: daemon | manual
+  State: running | disabled | stale | error
+  PID: ...
+  Last event: ...
+  Last indexed: ...
+  Pending changes: ...
+  Freshness: Fresh | Stale
+```
+
+### P3: Knowledge Hygiene Diagnostics
+
+`contextgraph status` 可以增加只读诊断，但不能输出自动写入指令。
+
+示例：
+
+```text
+Knowledge Hygiene
+  Handoff-only P1 facts: 2
+  Stale source warnings: 1
+  Possible conflicts: 1
+  Fragmented topic clusters: 3
+  Suggested action: human review recommended
+```
+
+允许的安全建议：
+
+```text
+2 P1-level facts appear only in recent handoff notes.
+Consider reviewing them and promoting confirmed facts into project source-of-truth docs.
+```
+
+禁止默认建议：
+
+```text
+Write these facts into AGENTS.md.
+```
+
+除非用户显式配置了 `sourceOfTruth` 和 `writableTargets`，否则不要推荐具体写入目标文件。
+
+MCP 返回 Knowledge Hygiene 时必须更保守：
+
+```json
+{
+  "knowledgeHygiene": {
+    "recommendation": "Human review recommended before updating project documentation.",
+    "agentActionAllowed": false,
+    "requiresHumanApproval": true
+  }
+}
+```
+
+### P4: Candidate Memory / Patch Proposal
+
+候选经验机制必须显式开启，默认写入 ContextGraph 管理区，而不是直接写入项目真相文档。
+
+计划命令：
+
+```bash
+contextgraph note add
+contextgraph note list
+contextgraph note approve
+contextgraph note reject
+contextgraph note export
+```
+
+默认存储位置：
+
+- `.contextgraph/inbox/`
+- 或用户显式配置的 `docs/contextgraph-candidates.md`
+
+候选经验必须标记：
+
+- `status: candidate`
+- `requiresHumanReview: true`
+- `source: agent`
+- `confidence: low | medium | high`
+
+状态流：
+
+```text
+candidate -> human_reviewed -> confirmed -> deprecated -> superseded
+```
+
+Confirmed 只能来自正式文档、人类确认、明确 handoff 说明加人工 approve、测试验证，或 extractor 高置信抽取加 schema 校验和审核机制。
+
 ## v0.1.x: Query Planner Lite
 
 当前阶段目标是修复 MCP 自然语言查询对关键词组合敏感的问题。ContextGraph does not make agents better at grep. It removes the need for agents to guess the right grep query.
@@ -429,6 +652,10 @@ Extractor 只处理高价值 block，不处理全量内容。高价值判断包�
 - required tests 推荐
 - stale context warning
 - candidate / confirmed 规则治理
+- Knowledge Hygiene / Documentation Debt / Source-of-Truth Warnings
+- Candidate Memory Review
+- handoff latest/history freshness labels
+- read-only knowledge policy enforcement
 
 `contextgraph status` 必须升级为可靠性面板：
 
@@ -499,3 +726,30 @@ Overall reliability:  Medium
 - status 明确显示 Context index / Embedding index / Extractor index 的新鲜度。
 - query 结果标注来源、置信度和 status。
 - 所有新增功能必须有测试。
+
+## Knowledge Governance Test Requirements
+
+后续实现 Knowledge Governance / Handoff / Daemon 时必须新增或更新测试覆盖：
+
+- handoff append-only
+- handoff id uniqueness
+- `handoff latest` / `handoff list` / `handoff show`
+- `brief` only includes latest handoff by default
+- historical handoff marked as historical / stale / possibly_outdated
+- MCP historical handoff includes usage warning
+- status Knowledge Hygiene does not include direct write instruction by default
+- default knowledgePolicy is read-only
+- no command silently modifies README / AGENTS.md / docs
+- daemon start writes pid/state/log
+- daemon stop marks state disabled
+- source changes without indexing show stale reminder
+
+本阶段不要做：
+
+- 不要实现自动写入 AGENTS.md。
+- 不要让 status 推荐具体写入文件，除非用户配置 `writableTargets`。
+- 不要让 MCP `agentActionAllowed` 默认为 true。
+- 不要把 handoff-derived facts 默认 confirmed。
+- 不要默认把所有历史 handoff 注入 brief。
+- 不要在 npm install 后自动启动 daemon。
+- 不要引入远程 LLM 或上传项目数据。

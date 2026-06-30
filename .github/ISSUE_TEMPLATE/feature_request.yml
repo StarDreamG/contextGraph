@@ -1,5 +1,5 @@
 name: Feature request
-description: Propose a concrete feature or requirement
+description: Propose a ContextGraph feature or agent workflow improvement
 title: "[Feature]: "
 labels: ["feature", "needs-triage"]
 body:
@@ -15,6 +15,20 @@ body:
     attributes:
       label: User story
       description: As a user, I want to..., so that...
+    validations:
+      required: true
+  - type: textarea
+    id: agent_workflow
+    attributes:
+      label: Agent workflow
+      description: Where does this fit into init, index, status, brief, query, handoff, MCP, or another agent workflow?
+    validations:
+      required: true
+  - type: textarea
+    id: why_current_tools_not_enough
+    attributes:
+      label: Why README / AGENTS / grep is not enough
+      description: Explain the project experience gap this should solve.
     validations:
       required: true
   - type: textarea
@@ -47,6 +61,20 @@ body:
     attributes:
       label: Technical notes
       description: Related modules, files, APIs, risks.
+    validations:
+      required: false
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: Expected query / brief / MCP behavior
+      description: Include example queries or MCP responses if useful.
+    validations:
+      required: false
+  - type: textarea
+    id: security
+    attributes:
+      label: Local-first or security concerns
+      description: Note any data upload, provider, secret redaction, or sensitive project content concerns.
     validations:
       required: false
   - type: dropdown

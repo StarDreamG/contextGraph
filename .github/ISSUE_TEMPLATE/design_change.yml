@@ -1,5 +1,5 @@
 name: Design change
-description: Propose a product, architecture, or workflow change
+description: Propose a product, architecture, local-first safety, or agent workflow change
 title: "[Design Change]: "
 labels: ["design-change", "needs-review"]
 body:
@@ -32,12 +32,28 @@ body:
     validations:
       required: true
   - type: textarea
+    id: agent_memory_boundary
+    attributes:
+      label: ContextGraph boundary
+      description: Explain how this preserves the boundary between project experience facts and source-code facts.
+    validations:
+      required: true
+  - type: textarea
+    id: local_first_safety
+    attributes:
+      label: Local-first and security impact
+      description: Note any effects on upload behavior, remote providers, query-time model calls, secret redaction, or indexed sensitive files.
+    validations:
+      required: true
+  - type: textarea
     id: acceptance_criteria
     attributes:
       label: Acceptance criteria
       value: |
         - [ ] Product docs updated if needed
         - [ ] Implementation impact identified
+        - [ ] Local-first and security impact reviewed
+        - [ ] CodeGraph / Sourcegraph / LSP boundary preserved
         - [ ] Follow-up Issues created if needed
     validations:
       required: true
