@@ -1,0 +1,29 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; background:#0b0f14; color:#c9d1d9;
+    font: 15px/1.75 "SF Mono","Menlo","Monaco","PingFang SC","Hiragino Sans GB",monospace;
+    padding:56px 64px; }
+  .kicker { color:#7d8590; font-size:13px; letter-spacing:.12em; text-transform:uppercase; }
+  h1 { font-size:22px; margin:10px 0 6px; color:#e6edf3; font-weight:600; }
+  .sub { color:#8b949e; font-size:14px; margin-bottom:34px; }
+  pre { margin:0; white-space:pre-wrap; }
+  .card { background:#11161d; border:1px solid #21262d; border-radius:10px; padding:30px 34px; }
+  .head { color:#e6edf3; font-weight:600; }
+  .dim { color:#7d8590; }
+  .ok { color:#3fb950; }
+  .warn { color:#d29922; }
+  .key { color:#58a6ff; }
+  .quote { color:#a5d6ff; }
+</style></head><body>
+<div class="kicker">DeepSeek Harness · 插件 dsh-contextgraph</div>
+<h1>改一个分支，记忆不该变成“不可信”</h1>
+<div class="sub">contextgraph_status — 三态新鲜度</div>
+<div class="card"><pre><span class="head">ContextGraph · /Users/apple/personal/contextGraph</span>
+状态：<span class="warn">可用：HEAD 已变但源码未改</span>（4 个月前索引）（可信度 <span class="ok">high</span>）
+规模：40 源文件 / 411 块 / 906 节点 / 1306 边
+上次索引：2026-07-07T06:29:32.418Z（4 个月前）
+索引时 HEAD：<span class="key">11a750e5</span>，当前 HEAD：<span class="key">485f0dc8</span>
+说明：HEAD 变了但源文件没变（切换分支/合并/变基），记忆仍然有效，无需重新索引。
+<span class="dim">—— 同一条库，上游 CLI 在这里判 Stale / Low，因为它的判据是 "HEAD 动过"。</span></pre></div>
+</body></html>

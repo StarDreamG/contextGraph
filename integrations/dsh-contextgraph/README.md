@@ -1,6 +1,8 @@
 # dsh-contextgraph
 
-把项目里已经存在的 [ContextGraph](../../README.md) 记忆库接进 DSH agent。
+把项目里已经存在的 [ContextGraph](https://github.com/StarDreamG/contextGraph) 记忆库接进 DSH agent。
+
+![改一个分支，记忆不该变成"不可信"](docs/screenshots/status.png)
 
 ContextGraph 本身解决的是「项目经验沉淀」：把仓库里的 README、设计稿、交接文档、测试说明切成块，抽成 Rule / Test / Environment / Failure / Decision 等节点，存进 `.contextgraph/graph.db`。问题是它只有 CLI 和 MCP，agent 得手动去查，而且 `contextgraph status` 一看到 git HEAD 变了就把整个库标成 `Stale / Low`，实际上那几百条部署事实并不会因为一次分支切换而失效。
 
@@ -9,6 +11,11 @@ ContextGraph 本身解决的是「项目经验沉淀」：把仓库里的 README
 - **开工自动给简报**：agent 创建时注入一段不到 1000 字的项目记忆，只放必守规则、常用测试命令、环境事实，每条带来源文件与行号。
 - **按需精确召回**：`contextgraph_recall` 支持按问题、按文件、按模块查，带 token 预算，结果按「值不值得信」排序。
 - **收尾写回**：`contextgraph_handoff` 把本次会话的结论写回同一个记忆库，供后续会话检索。
+
+![改代码前，先问这个项目踩过什么坑](docs/screenshots/recall.png)
+
+![会话一开，就知道哪些线不能踩](docs/screenshots/brief.png)
+
 
 ## 与 `contextgraph query` 的差别
 
@@ -24,11 +31,19 @@ ContextGraph 本身解决的是「项目经验沉淀」：把仓库里的 README
 ## 安装
 
 ```bash
-# 在 DSH 里
-plugin_manager install_bundle /Users/apple/personal/contextGraph/integrations/dsh-contextgraph
+# 从 GitHub 装（github owner/repo 简写）
+dsh plugin add StarDreamG/dsh-contextgraph
+
+# 等价的 git 写法
+dsh plugin add "git+https://github.com/StarDreamG/dsh-contextgraph.git"
+
+# 或从本地目录装
+plugin_manager install_bundle /path/to/dsh-contextgraph
 ```
 
 装完后重启会话即可生效。没有 `.contextgraph/graph.db` 的项目不会触发任何工具或注入，所以可以全局启用。
+
+前置条件只有一个：目标项目跑过 `contextgraph index`，目录下有 `.contextgraph/graph.db`。插件自带零依赖，不需要 `better-sqlite3`，也不要求 PATH 里有 `contextgraph`。
 
 ## 配置
 
@@ -74,7 +89,8 @@ plugin_manager install_bundle /Users/apple/personal/contextGraph/integrations/ds
 ## 验证
 
 ```bash
-node integrations/dsh-contextgraph/tests/smoke.mjs
+node tests/smoke.mjs   # 对本机真实库跑新鲜度 + 召回 + 简报
+node tests/head.mjs    # HEAD 比较的回归测试
 ```
 
 本机实测（2026-11-09）：

@@ -1,0 +1,38 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; background:#0b0f14; color:#c9d1d9;
+    font: 15px/1.75 "SF Mono","Menlo","Monaco","PingFang SC","Hiragino Sans GB",monospace;
+    padding:56px 64px; }
+  .kicker { color:#7d8590; font-size:13px; letter-spacing:.12em; text-transform:uppercase; }
+  h1 { font-size:22px; margin:10px 0 6px; color:#e6edf3; font-weight:600; }
+  .sub { color:#8b949e; font-size:14px; margin-bottom:34px; }
+  pre { margin:0; white-space:pre-wrap; }
+  .card { background:#11161d; border:1px solid #21262d; border-radius:10px; padding:30px 34px; }
+  .head { color:#e6edf3; font-weight:600; }
+  .dim { color:#7d8590; }
+  .ok { color:#3fb950; }
+  .warn { color:#d29922; }
+  .key { color:#58a6ff; }
+  .quote { color:#a5d6ff; }
+</style></head><body>
+<div class="kicker">DeepSeek Harness · 插件 dsh-contextgraph</div>
+<h1>改代码前，先问这个项目踩过什么坑</h1>
+<div class="sub">contextgraph_recall — 带来源与行号</div>
+<div class="card"><pre><span class="head">ContextGraph · FirefightingAgent · 检索：“部署” · 新鲜（11 天前索引）</span>
+[1] 规则 <span class="warn">P0</span> 171 部署拓扑
+    来源 docs/handoff/2026-07-26-pc-coze-chunked-report-agent-handoff.md:78-86
+    - 主机：<span class="quote">192.168.20.171</span>，用户 <span class="quote">sjkj</span>
+    - 目录：<span class="quote">/home/sjkj/gf/FirefightingAgent</span>
+    - Compose：仅 <span class="quote">-p firefighting-agent</span>，端口 <span class="quote">61202</span>→8787
+    - 禁止碰 Compose <span class="quote">current</span>、端口 <span class="quote">61192</span>、<span class="quote">current_mysql_data</span>
+    - 公网：<span class="key">https://180.168.178.174:61202/</span>
+
+[2] 规则 <span class="warn">P0</span> 171 部署约束
+    来源 README.md:123-145
+    - 所有 Compose 命令必须显式使用 <span class="quote">docker compose -p firefighting-agent</span>
+    - 不得修改智策星 Compose 的端口与数据卷
+
+[3] 规则 <span class="warn">P0</span> 固定事实
+    <span class="dim">…… 共 3 条 · 14ms</span></pre></div>
+</body></html>
