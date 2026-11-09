@@ -12,12 +12,13 @@
     "./package.json": "./package.json"
   },
   "files": [
-    "index.js",
-    "lib",
-    "locale",
+    "LICENSE",
+    "README.md",
     "cordis.patch.yml",
     "icon.svg",
-    "README.md"
+    "index.js",
+    "lib",
+    "locale"
   ],
   "license": "Apache-2.0",
   "author": "StarDreamG",
