@@ -1,5 +1,5 @@
 {
-  "name": "@local/dsh-contextgraph",
+  "name": "dsh-contextgraph",
   "version": "0.1.0",
   "description": "Bind ContextGraph project memory to the agent: recall before work, handoff after work, freshness that does not cry wolf.",
   "icon": "./icon.svg",
@@ -20,11 +20,25 @@
     "README.md"
   ],
   "license": "Apache-2.0",
+  "author": "StarDreamG",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/StarDreamG/dsh-contextgraph.git"
+  },
+  "homepage": "https://github.com/StarDreamG/dsh-contextgraph#readme",
+  "bugs": {
+    "url": "https://github.com/StarDreamG/dsh-contextgraph/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
   "keywords": [
     "dsh",
+    "dsh-plugin",
     "contextgraph",
     "memory",
-    "coding-agent"
+    "coding-agent",
+    "project-memory"
   ],
   "dsh": {
     "bundle": {
