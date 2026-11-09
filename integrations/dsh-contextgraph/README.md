@@ -82,6 +82,10 @@ plugin_manager install_bundle /path/to/dsh-contextgraph
 
 返回状态、可信度、库规模、索引后改动的文件列表，并在需要重新索引时给出提示。
 
+## 分支与发布
+
+插件在日常开发中住在主仓 `StarDreamG/contextGraph` 的 `feat/dsh-contextgraph-plugin` 分支，发布时用 `git subtree split` 生成独立仓库 `StarDreamG/dsh-contextgraph`——因为市场要求仓库名 slug 化，而 `contextGraph` 带大写字母过不了校验。完整流程见 [docs/MAINTAINING.md](docs/MAINTAINING.md)。
+
 ## 依赖
 
 零依赖。SQLite 用 Node 24 内置的 `node:sqlite`，不依赖 `better-sqlite3`，也不要求 PATH 里有 `contextgraph`。启动时会有一次 `ExperimentalWarning: SQLite is an experimental feature`，属正常。
