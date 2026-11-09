@@ -31,14 +31,13 @@ ContextGraph 本身解决的是「项目经验沉淀」：把仓库里的 README
 ## 安装
 
 ```bash
-# 从 GitHub 装（github owner/repo 简写）
-dsh plugin add StarDreamG/dsh-contextgraph
-
-# 等价的 git 写法
+# 从 GitHub 装
+dsh plugin add "github:StarDreamG/dsh-contextgraph"
+# 等价写法
 dsh plugin add "git+https://github.com/StarDreamG/dsh-contextgraph.git"
 
-# 或从本地目录装
-plugin_manager install_bundle /path/to/dsh-contextgraph
+# 从本地目录装（开发时用）
+dsh plugin add /path/to/dsh-contextgraph
 ```
 
 装完后重启会话即可生效。没有 `.contextgraph/graph.db` 的项目不会触发任何工具或注入，所以可以全局启用。
