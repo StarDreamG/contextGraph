@@ -1,0 +1,16 @@
+# ContextGraph project memory for the agent.
+#
+# Reads the .contextgraph/graph.db that already exists in a project — it does not
+# index, watch, or rewrite that database — so it is safe to enable globally: a
+# project without a graph simply sees no tools firing and no injected brief.
+
+- insert:
+    - id: contextgraph
+      name: '@local/dsh-contextgraph'
+      config:
+        # Inject a compact project brief into a freshly created agent.
+        autoBrief: true
+        # Character budget for that automatic brief.
+        briefBudget: 900
+        # Character budget for one contextgraph_recall answer.
+        recallBudget: 1600

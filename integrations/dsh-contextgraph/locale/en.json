@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "ContextGraph memory",
+    "description": "Connects the ContextGraph memory already present in a project: a compact brief of the rules, test commands and environment facts is injected when an agent starts, contextgraph_recall answers questions by task, file or module with a token budget, and contextgraph_handoff records what the session learned."
+  }
+}

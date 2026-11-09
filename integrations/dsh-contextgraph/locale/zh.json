@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "ContextGraph 项目记忆",
+    "description": "把项目里已有的 ContextGraph 经验库接入 agent：开工时自动注入关键规则、测试命令与环境事实，contextgraph_recall 可按任务、文件或模块带预算召回历史踩坑与决策，contextgraph_handoff 在收尾时写回本次会话的结论。"
+  }
+}
