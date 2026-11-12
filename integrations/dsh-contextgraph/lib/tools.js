@@ -7,6 +7,7 @@
 import { assessFreshness, describeFreshness, findGraphRoot, openGraph, readCounts, relativeTime } from './project.js'
 import { recall } from './recall.js'
 import { recordHandoff } from './handoff.js'
+import { findSessions, renderSessions } from './session.js'
 
 const TEXT_OUTPUT = {
   schema: {
@@ -66,6 +67,25 @@ const HANDOFF_PARAMETERS = {
     },
   },
   required: ['task', 'summary'],
+  additionalProperties: false,
+}
+
+const SESSION_PARAMETERS = {
+  type: 'object',
+  properties: {
+    id: {
+      type: 'string',
+      description: '会话 id，例如 2026-11-12-141957-560-codex-a6c3a2。支持只用一部分：结尾 6 位（a6c3a2）或开头日期（2026-11-12-141957）。',
+    },
+    agent: {
+      type: 'string',
+      description: '只看某个 agent 的记录，例如 codex / dsh / sol。可选。',
+    },
+    limit: {
+      type: 'number',
+      description: '不给 id 时列出最近多少条会话，默认 10，上限 30。',
+    },
+  },
   additionalProperties: false,
 }
 
@@ -147,6 +167,41 @@ export function registerTools(ctx, settings) {
           }
         } catch (error) {
           return { text: `写入 ContextGraph 失败：${messageOf(error)}` }
+        }
+      },
+    }
+  )
+
+  ctx.tools.register(
+    {
+      name: 'contextgraph_session',
+      description:
+        '按 id 取一次 ContextGraph 会话记录的全文：任务、结论、涉及文件、git HEAD。' +
+        '当你看到一个形如 2026-11-12-141957-560-codex-a6c3a2 的 id（出现在 commit message、日报、交接文档、其他项目的 handoff 里），' +
+        '用这个工具直接取，不要用 contextgraph_recall——recall 会把 id 拆成词去模糊匹配，返回一堆无关规则且不报错。' +
+        'id 支持前缀：只给 a6c3a2 或 2026-11-12-141957 也能命中；不给 id 时列出最近若干条会话。',
+      parameters: SESSION_PARAMETERS,
+      output: TEXT_OUTPUT,
+      isConcurrencySafe: true,
+      async execute(args, exec) {
+        const root = projectRoot(ctx, exec)
+        if (!root) return notInitialized()
+        const id = typeof args?.id === 'string' ? args.id.trim() : ''
+        const db = openGraph(root)
+        try {
+          const { exact, matches, recent } = findSessions(db, {
+            id,
+            agent: typeof args?.agent === 'string' ? args.agent : '',
+            limit: Number.isFinite(args?.limit) ? Number(args.limit) : 10,
+          })
+          return {
+            text: renderSessions(exact, matches, recent, { id, db }),
+            count: exact ? 1 : matches.length || recent.length,
+          }
+        } catch (error) {
+          return { text: `读取 ContextGraph 会话失败：${messageOf(error)}`, count: 0 }
+        } finally {
+          db.close()
         }
       },
     }

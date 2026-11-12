@@ -6,11 +6,12 @@
 
 ContextGraph 本身解决的是「项目经验沉淀」：把仓库里的 README、设计稿、交接文档、测试说明切成块，抽成 Rule / Test / Environment / Failure / Decision 等节点，存进 `.contextgraph/graph.db`。问题是它只有 CLI 和 MCP，agent 得手动去查，而且 `contextgraph status` 一看到 git HEAD 变了就把整个库标成 `Stale / Low`，实际上那几百条部署事实并不会因为一次分支切换而失效。
 
-这个插件做三件事：
+这个插件做四件事：
 
 - **开工自动给简报**：agent 创建时注入一段不到 1000 字的项目记忆，只放必守规则、常用测试命令、环境事实，每条带来源文件与行号。
 - **按需精确召回**：`contextgraph_recall` 支持按问题、按文件、按模块查，带 token 预算，结果按「值不值得信」排序。
 - **收尾写回**：`contextgraph_handoff` 把本次会话的结论写回同一个记忆库，供后续会话检索。
+- **按 id 回查**：`contextgraph_session` 用 `2026-11-12-141957-560-codex-a6c3a2` 这类 id（或它的任意前缀）直接取回那次会话的全文。
 
 ![改代码前，先问这个项目踩过什么坑](docs/screenshots/recall.png)
 
@@ -76,6 +77,19 @@ dsh plugin add /path/to/dsh-contextgraph
 ```
 
 写入格式与上游 `contextgraph handoff` 一致：`sessions` 一行、`AgentSession` 节点、每个文件一个 `File` 节点与 `RELATED_TO_FILE` 边、FTS 索引同步更新。上游额外的 `classifyBlock` 派生节点没有复刻——那套正则不是存储契约的一部分，猜错会写进一条下次 `contextgraph index` 无法调和的记录。
+
+### `contextgraph_session`
+
+```jsonc
+{ "id": "2026-11-12-141957-560-codex-a6c3a2" }  // 完整 id
+{ "id": "a6c3a2" }                              // 结尾 6 位也能命中
+{ "id": "2026-11-12-141957" }                   // 开头日期也能命中
+{ "agent": "codex", "limit": 20 }               // 不给 id 时列最近 20 条
+```
+
+按 id 取一次会话的全文：任务、结论、涉及文件、git HEAD、同期写入的记忆。
+
+这个工具存在的理由是**别的入口都会静默答错**。`contextgraph query 2026-11-12-141957-560-codex-a6c3a2` 会把 id 交给 FTS 拆成 `2026` 之类的词，返回一堆无关规则，还附一句 "Original query had no direct matches"，看起来像成功；`contextgraph external-session show` 读的是另一张表，直接 `External session not found`。结果就是 agent 只能 `sqlite3 graph.db "select * from sessions"` 自己捞。
 
 ### `contextgraph_status`
 
